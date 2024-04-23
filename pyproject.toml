@@ -3,16 +3,23 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = 'nomad-parser-plugin-example'
+name = 'nomad-parser-plugin-h5md'
 version = '1.0'
-description = 'An example parser plugin for NOMAD.'
+description = 'A NOMAD plugin for parsing hdf5 files according to the H5MD-NOMAD schema.'
 readme = "README.md"
 authors = [{ name = "The NOMAD Authors" }]
 license = { text = "Apache-2.0" }
-dependencies = ["nomad-lab>=1.2.0"]
+dependencies = [
+    "nomad-lab>=1.2.2dev578",
+    "nomad-schema-plugin-simulation-data@file:///home/jfrudzinski/work/soft/nomad/dependencies/schema/simulation/data/",
+    "nomad-schema-plugin-run@git+https://github.com/nomad-coe/nomad-schema-plugin-run.git@develop",
+    "nomad-schema-plugin-simulation-workflow@file:///home/jfrudzinski/work/soft/nomad/dependencies/schema/simulation/workflow/",
+]
 
 [project.urls]
-homepage = "https://github.com/nomad-coe/nomad-parser-example-plugin"
+homepage = "https://github.com/nomad-coe/nomad-parser-h5md"
+"Bug Tracker" = "https://github.com/nomad-coe/nomad-parser-h5md/issues"
+"Documentation" = "https://nomad-coe.github.io/nomad-parser-h5md/"
 
 [project.optional-dependencies]
 dev = [
@@ -23,9 +30,11 @@ dev = [
     'pytest-cov==2.7.1',
     'astroid==2.11.7',
     'typing-extensions==4.4.0',
+    "lxml_html_clean>=0.1.0",
 ]
 
 [tool.ruff]
+include = ["src/nomad_parser_h5md/*.py", "tests/*.py"]
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -68,7 +77,7 @@ select = [
     "UP",
     # isort
     "I",
-    # pylint 
+    # pylint
     "PL",
 ]
 
@@ -96,8 +105,9 @@ skip-magic-trailing-comma = false
 
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
+
 [tool.setuptools.packages.find]
-include = ["nomadparserexample*"]
+where = ["src"]
 
 [tool.setuptools.package-data]
-nomadschemaexample = ['*/nomad_plugin.yaml']
+nomad_simulations = ["*/nomad_plugin.yaml"]

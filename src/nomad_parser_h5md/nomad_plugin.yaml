@@ -1,0 +1,11 @@
+plugin_type: parser
+name: parsers/nomad_parser_h5md
+description: |
+  This is a parser for the [H5MD-NOMAD schema](https://fairmat-nfdi.github.io/AreaC-DOC/custom_schemas/h5md/explanation-H5MD-NOMAD/)
+# TODO Change the above link to the main NOMAD docs once updated
+mainfile_name_re: (r'^.*\.(h5|hdf5)$')
+mainfile_mime_re: r'(application/x-hdf)'
+mainfile_binary_header_re: rb'^\x89HDF'
+mainfile_contents_dict: {'__has_all_keys': ['h5md']}
+parser_class_name: nomad_parser_h5md.H5MDParser
+code_name: H5MD

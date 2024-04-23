@@ -6,7 +6,8 @@ plugins:
   # We only include our schema here. Without the explicit include, all plugins will be
   # loaded. Many build in plugins require more dependencies. Install nomad-lab[parsing]
   # to make all default plugins work.
-  include: 'parsers/example'
+  include:
+    - 'parsers/h5md'
   options:
-    parsers/example:
-      python_package: nomadparserexample
+    parsers/h5md:
+      python_package: nomad_parser_h5md
