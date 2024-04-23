@@ -814,72 +814,61 @@ class H5MDParser(MDParser):
         )
 
     def write_to_archive(self) -> None:
-        self._maindir = os.path.dirname(self.mainfile)
-        self._h5md_files = os.listdir(self._maindir)
-        self._basename = os.path.basename(self.mainfile).rsplit(".", 1)[0]
-        self._data_parser.mainfile = self.mainfile
-        if self._data_parser.filehdf5 is None:
-            self.logger.warning("hdf5 file missing in H5MD Parser.")
-            return
+        pass
+        # self._maindir = os.path.dirname(self.mainfile)
+        # self._h5md_files = os.listdir(self._maindir)
+        # self._basename = os.path.basename(self.mainfile).rsplit(".", 1)[0]
+        # self._data_parser.mainfile = self.mainfile
+        # if self._data_parser.filehdf5 is None:
+        #     self.logger.warning("hdf5 file missing in H5MD Parser.")
+        #     return
 
-    # def parse(self, filepath, archive: EntryArchive, logger):
-    #     self.filepath = os.path.abspath(filepath)
-    #     self.archive = archive
-    #     self.logger = logging.getLogger(__name__) if logger is None else logger
-    #     self._maindir = os.path.dirname(self.filepath)
-    #     self._h5md_files = os.listdir(self._maindir)
-    #     self._basename = os.path.basename(filepath).rsplit(".", 1)[0]
-    #     self._data_parser.mainfile = self.filepath
-    #     if self._data_parser.filehdf5 is None:
-    #         self.logger.warning("hdf5 file missing in H5MD Parser.")
-    #         return
+        # positions = self._data_parser.get(self._path_value_positions_all)
+        # if positions is not None:
+        #     self._n_frames = len(positions) if positions is not None else None
+        #     self._n_atoms = (
+        #         [len(pos) for pos in positions] if positions is not None else None
+        #     )
 
-        positions = self._data_parser.get(self._path_value_positions_all)
-        if positions is not None:
-            self._n_frames = len(positions) if positions is not None else None
-            self._n_atoms = (
-                [len(pos) for pos in positions] if positions is not None else None
-            )
+        # # Parse the hdf5 groups
+        # sec_run = Run()
+        # self.archive.run.append(sec_run)
 
-        # Parse the hdf5 groups
-        sec_run = Run()
-        self.archive.run.append(sec_run)
+        # group_h5md = self._data_parser.get("h5md")
+        # if group_h5md:
+        #     program_name = self._data_parser.get("h5md.program.name", isattr=True)
+        #     program_version = self._data_parser.get("h5md.program.version", isattr=True)
+        #     sec_run.program = Program(name=program_name, version=program_version)
+        #     h5md_version = self._data_parser.get("h5md.version", isattr=True)
+        #     sec_run.x_h5md_version = h5md_version
+        #     h5md_author_name = self._data_parser.get("h5md.author.name", isattr=True)
+        #     h5md_author_email = self._data_parser.get("h5md.author.email", isattr=True)
+        #     sec_run.x_h5md_author = Author(
+        #         name=h5md_author_name, email=h5md_author_email
+        #     )
+        #     h5md_creator_name = self._data_parser.get("h5md.creator.name", isattr=True)
+        #     h5md_creator_version = self._data_parser.get(
+        #         "h5md.creator.version", isattr=True
+        #     )
+        #     sec_run.x_h5md_creator = Program(
+        #         name=h5md_creator_name, version=h5md_creator_version
+        #     )
+        # else:
+        #     self.logger.warning(
+        #         '"h5md" group missing in (H5MD)hdf5 file.'
+        #         " Program and author metadata will be missing!"
+        #     )
 
-        group_h5md = self._data_parser.get("h5md")
-        if group_h5md:
-            program_name = self._data_parser.get("h5md.program.name", isattr=True)
-            program_version = self._data_parser.get("h5md.program.version", isattr=True)
-            sec_run.program = Program(name=program_name, version=program_version)
-            h5md_version = self._data_parser.get("h5md.version", isattr=True)
-            sec_run.x_h5md_version = h5md_version
-            h5md_author_name = self._data_parser.get("h5md.author.name", isattr=True)
-            h5md_author_email = self._data_parser.get("h5md.author.email", isattr=True)
-            sec_run.x_h5md_author = Author(
-                name=h5md_author_name, email=h5md_author_email
-            )
-            h5md_creator_name = self._data_parser.get("h5md.creator.name", isattr=True)
-            h5md_creator_version = self._data_parser.get(
-                "h5md.creator.version", isattr=True
-            )
-            sec_run.x_h5md_creator = Program(
-                name=h5md_creator_name, version=h5md_creator_version
-            )
-        else:
-            self.logger.warning(
-                '"h5md" group missing in (H5MD)hdf5 file.'
-                " Program and author metadata will be missing!"
-            )
+        # self.parse_atom_parameters()
+        # self.parse_system_info()
+        # self.parse_observable_info()
+        # self.parse_parameter_info()
 
-        self.parse_atom_parameters()
-        self.parse_system_info()
-        self.parse_observable_info()
-        self.parse_parameter_info()
+        # # Populate the archive
+        # self.parse_method()
 
-        # Populate the archive
-        self.parse_method()
+        # self.parse_system()
 
-        self.parse_system()
+        # self.parse_calculation()
 
-        self.parse_calculation()
-
-        self.parse_workflow()
+        # self.parse_workflow()
