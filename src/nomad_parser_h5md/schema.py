@@ -37,6 +37,7 @@ import runschema.system  # pylint: disable=unused-import
 
 m_package = Package()
 
+# TODO update this entire schema!
 
 class ParamEntry(MSection):
     """

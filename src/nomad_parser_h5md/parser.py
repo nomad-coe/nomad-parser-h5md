@@ -54,6 +54,17 @@ from .schema import ParamEntry, CalcEntry, Author
 from nomad.units import ureg
 from ase.symbols import symbols2numbers
 
+# New schema
+from nomad_simulations import Simulation, Program as BaseProgram
+from nomad_simulations.model_system import ModelSystem, AtomicCell
+from nomad_simulations.atoms_state import (
+    AtomsState,
+    HubbardInteractions,
+    CoreHole,
+    OrbitalsState,
+)
+
+from .schema2 import Author as Author2
 
 class HDF5Parser(FileParser):
     def __init__(self):
@@ -813,6 +824,27 @@ class H5MDParser(MDParser):
             dict(method=workflow_parameters, results=workflow_results)
         )
 
+    def parse_h5md_group(self) -> dict:
+        group_h5md = self._data_parser.get("h5md")
+        group_h5md_dict = {}
+        if group_h5md:
+            group_h5md_dict['program_name'] = self._data_parser.get("h5md.program.name", isattr=True)
+            group_h5md_dict['program_version'] = self._data_parser.get("h5md.program.version", isattr=True)
+            group_h5md_dict['h5md_version'] = self._data_parser.get("h5md.version", isattr=True)
+            group_h5md_dict['h5md_author_name'] = self._data_parser.get("h5md.author.name", isattr=True)
+            group_h5md_dict['h5md_author_email'] = self._data_parser.get("h5md.author.email", isattr=True)
+            group_h5md_dict['h5md_creator_name'] = self._data_parser.get("h5md.creator.name", isattr=True)
+            group_h5md_dict['h5md_creator_version'] = self._data_parser.get(
+                "h5md.creator.version", isattr=True
+            )
+        else:
+            self.logger.warning(
+                '"h5md" group missing in (H5MD)hdf5 file.'
+                " Program and author metadata will be missing!"
+            )
+
+        return group_h5md_dict
+
     def write_to_archive(self) -> None:
         self._maindir = os.path.dirname(self.mainfile)
         self._h5md_files = os.listdir(self._maindir)
@@ -828,43 +860,28 @@ class H5MDParser(MDParser):
             self._n_atoms = (
                 [len(pos) for pos in positions] if positions is not None else None
             )
-
         # Parse the hdf5 groups
-        sec_run = Run()
-        print('we are live')
-        self.archive.run.append(sec_run)
-
-        group_h5md = self._data_parser.get("h5md")
-        if group_h5md:
-            program_name = self._data_parser.get("h5md.program.name", isattr=True)
-            program_version = self._data_parser.get("h5md.program.version", isattr=True)
-            sec_run.program = Program(name=program_name, version=program_version)
-            h5md_version = self._data_parser.get("h5md.version", isattr=True)
-            sec_run.x_h5md_version = h5md_version
-            h5md_author_name = self._data_parser.get("h5md.author.name", isattr=True)
-            h5md_author_email = self._data_parser.get("h5md.author.email", isattr=True)
-            sec_run.x_h5md_author = Author(
-                name=h5md_author_name, email=h5md_author_email
-            )
-            h5md_creator_name = self._data_parser.get("h5md.creator.name", isattr=True)
-            h5md_creator_version = self._data_parser.get(
-                "h5md.creator.version", isattr=True
-            )
-            sec_run.x_h5md_creator = Program(
-                name=h5md_creator_name, version=h5md_creator_version
-            )
-        else:
-            self.logger.warning(
-                '"h5md" group missing in (H5MD)hdf5 file.'
-                " Program and author metadata will be missing!"
-            )
+        group_h5md_dict = self.parse_h5md_group()
 
         self.parse_atom_parameters()
         self.parse_system_info()
         self.parse_observable_info()
         self.parse_parameter_info()
 
-        # Populate the archive
+        ###########################
+        # Populate the OLD SCHEMA #
+        ###########################
+        sec_run = Run()
+        self.archive.run.append(sec_run)
+        sec_run.program = Program(name=group_h5md_dict.get('program_name'), version=group_h5md_dict.get('program_version'))
+        sec_run.x_h5md_version = group_h5md_dict.get('h5md_version')
+        sec_run.x_h5md_author = Author(
+            name=group_h5md_dict.get('h5md_author_name'), email=group_h5md_dict.get('h5md_author_email')
+        )
+        sec_run.x_h5md_creator = Program(
+            name=group_h5md_dict.get('h5md_creator_name'), version=group_h5md_dict.get('h5md_creator_version')
+        )
+
         self.parse_method()
 
         self.parse_system()
@@ -872,3 +889,28 @@ class H5MDParser(MDParser):
         self.parse_calculation()
 
         self.parse_workflow()
+
+
+        ###########################
+        # Populate the NEW SCHEMA #
+        ###########################
+        # simulation = Simulation()
+        # simulation.program = BaseProgram(
+        #     name=group_h5md_dict.get('program_name'),
+        #     version=group_h5md_dict.get('program_version')
+        # )
+        # simulation.x_h5md_version = group_h5md_dict.get('h5md_version')
+        # simulation.x_h5md_author = Author2(
+        #     name=group_h5md_dict.get('h5md_author_name'), email=group_h5md_dict.get('h5md_author_email')
+        # )
+        # simulation.x_h5md_creator = BaseProgram(
+        #     name=group_h5md_dict.get('h5md_creator_name'), version=group_h5md_dict.get('h5md_creator_version')
+        # )
+
+        # # model_system = self.parse_system(simulation)
+        # # simulation.model_system.append(model_system)
+        # # self.parse_method(simulation)
+        # # self.parse_winput(simulation)
+        # # self.parse_output(simulation)
+        # self.archive.m_add_sub_section(EntryArchive.data, simulation)
+
