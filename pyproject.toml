@@ -10,10 +10,10 @@ readme = "README.md"
 authors = [{ name = "The NOMAD Authors" }]
 license = { text = "Apache-2.0" }
 dependencies = [
-    "nomad-lab>=1.2.2dev578",
-    "nomad-schema-plugin-simulation-data@file:///home/jfrudzinski/work/soft/nomad/dependencies/schema/simulation/data/",
+    "nomad-lab@file:///home/jfrudzinski/work/soft/nomad/",
+    "nomad-schema-plugin-simulation-workflow@git+https://github.com/nomad-coe/nomad-schema-plugin-simulation-workflow.git@develop",
     "nomad-schema-plugin-run@git+https://github.com/nomad-coe/nomad-schema-plugin-run.git@develop",
-    "nomad-schema-plugin-simulation-workflow@file:///home/jfrudzinski/work/soft/nomad/dependencies/schema/simulation/workflow/",
+    "nomad-schema-plugin-simulation-data@git+https://github.com/nomad-coe/nomad-schema-plugin-simulation-data.git@develop",
 ]
 
 [project.urls]
@@ -110,4 +110,4 @@ line-ending = "auto"
 where = ["src"]
 
 [tool.setuptools.package-data]
-nomad_simulations = ["*/nomad_plugin.yaml"]
+nomad_parser_h5md = ["*/nomad_plugin.yaml"]

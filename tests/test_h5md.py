@@ -19,7 +19,7 @@
 import pytest
 import numpy as np
 
-# from nomad.datamodel import EntryArchive
+from nomad.datamodel import EntryArchive
 from nomad_parser_h5md.parser import H5MDParser
 
 
@@ -32,9 +32,9 @@ def parser():
     return H5MDParser()
 
 
-# def test_md(parser):
-#     archive = EntryArchive()
-#     parser.parse('tests/data/openmm/test_traj_openmm_5frames.h5', archive, None)
+def test_md(parser):
+    archive = EntryArchive()
+    parser.parse('tests/data/openmm/test_traj_openmm_5frames.h5', archive, None)
 
     # sec_run = archive.run[0]
     # assert sec_run.program.name == 'OpenMM'

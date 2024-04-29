@@ -8,6 +8,15 @@ plugins:
   # to make all default plugins work.
   include:
     - 'parsers/h5md'
+    - 'runschema'
+    - 'simulationworkflowschema'
+    - 'schemas/nomad_simulations'
   options:
     parsers/h5md:
       python_package: nomad_parser_h5md
+    runschema:
+      python_package: runschema
+    simulationworkflowschema:
+      python_package: simulationworkflowschema
+    schemas/nomad_simulations:
+      python_package: nomad_simulations
