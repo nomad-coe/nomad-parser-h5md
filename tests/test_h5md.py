@@ -70,6 +70,7 @@ def test_md(parser):
     # assert sec_method[0].force_field.force_calculations.neighbor_searching.neighbor_update_frequency == 1
     # assert sec_method[0].force_field.force_calculations.neighbor_searching.neighbor_update_cutoff.to('nm').magnitude == approx(1.2)
 
+    ## @BM here is the testing of the old parsing of system
     # sec_systems = sec_run.system
     # assert len(sec_systems) == 5
     # assert np.shape(sec_systems[0].atoms.positions) == (31583, 3)

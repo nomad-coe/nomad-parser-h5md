@@ -592,7 +592,7 @@ class H5MDParser(MDParser):
 
         self._system_time_map = {}
         for i_step, step in enumerate(self.trajectory_steps):
-            time = system_info[step].pop("time")
+            # time = system_info[step].pop("time") # unused!
             atoms_dict = system_info[step]
 
             atom_labels = atoms_dict.get("labels")
@@ -845,49 +845,55 @@ class H5MDParser(MDParser):
 
         return group_h5md_dict
 
-    # def parse_system_hierarchy(
-    #     self,
-    #     nomad_sec: ModelSystem,
-    #     h5md_sec_particlesgroup: Group,
-    #     path_particlesgroup: str,
-    # ):
-    #     for i_key, key in enumerate(h5md_sec_particlesgroup.keys()):
-    #         path_particlesgroup_key = f"{path_particlesgroup}.{key}"
-    #         particles_group = {
-    #             group_key: self._data_parser.get(
-    #                 f"{path_particlesgroup_key}.{group_key}"
-    #             )
-    #             for group_key in h5md_sec_particlesgroup[key].keys()
-    #         }
-    #         sec_atomsgroup = ModelSystem()
-    #         nomad_sec.atoms_group.append(sec_atomsgroup)
-    #         sec_atomsgroup.type = particles_group.pop("type", None)
-    #         sec_atomsgroup.index = i_key
-    #         sec_atomsgroup.atom_indices = particles_group.pop("indices", None)
-    #         sec_atomsgroup.n_atoms = (
-    #             len(sec_atomsgroup.atom_indices)
-    #             if sec_atomsgroup.atom_indices is not None
-    #             else None
-    #         )
-    #         sec_atomsgroup.is_molecule = particles_group.pop("is_molecule", None)
-    #         sec_atomsgroup.label = particles_group.pop("label", None)
-    #         sec_atomsgroup.composition_formula = particles_group.pop("formula", None)
-    #         particles_subgroup = particles_group.pop("particles_group", None)
-    #         # set the remaining attributes
-    #         for particles_group_key in particles_group.keys():
-    #             val = particles_group.get(particles_group_key)
-    #             units = val.units if hasattr(val, "units") else None
-    #             val = val.magnitude if units is not None else val
-    #             sec_atomsgroup.x_h5md_parameters.append(
-    #                 ParamEntry(kind=particles_group_key, value=val, unit=units)
-    #             )
-    #         # get the next atomsgroup
-    #         if particles_subgroup:
-    #             self.parse_system_hierarchy(
-    #                 sec_atomsgroup,
-    #                 particles_subgroup,
-    #                 f"{path_particlesgroup_key}.particles_group",
-                # )
+    def parse_system_hierarchy(
+        self,
+        nomad_sec: ModelSystem,
+        h5md_sec_particlesgroup: Group,
+        path_particlesgroup: str,
+    ):
+
+    # @BM - below is an amended version of the old function for creating the atoms_group hierarchy
+    # The necessary changes have already been made to create the appropriate hierarchy
+    # You could now try to the quantities: branch_label, branch_depth, atom_indices, bond_list (optional)
+    # later I can add some missing quantities from the old schema like: is_molecule, composition
+
+        for i_key, key in enumerate(h5md_sec_particlesgroup.keys()):
+            path_particlesgroup_key = f"{path_particlesgroup}.{key}"
+            particles_group = {
+                group_key: self._data_parser.get(
+                    f"{path_particlesgroup_key}.{group_key}"
+                )
+                for group_key in h5md_sec_particlesgroup[key].keys()
+            }
+            sec_atomsgroup = ModelSystem()
+            nomad_sec.model_system.append(sec_atomsgroup)
+            # sec_atomsgroup.type = particles_group.pop("type", None)
+            # sec_atomsgroup.index = i_key
+            # sec_atomsgroup.atom_indices = particles_group.pop("indices", None)
+            # sec_atomsgroup.n_atoms = (
+            #     len(sec_atomsgroup.atom_indices)
+            #     if sec_atomsgroup.atom_indices is not None
+            #     else None
+            # )
+            # sec_atomsgroup.is_molecule = particles_group.pop("is_molecule", None)
+            # sec_atomsgroup.label = particles_group.pop("label", None)
+            # sec_atomsgroup.composition_formula = particles_group.pop("formula", None)
+            particles_subgroup = particles_group.pop("particles_group", None)
+            # set the remaining attributes
+            # for particles_group_key in particles_group.keys():
+            #     val = particles_group.get(particles_group_key)
+            #     units = val.units if hasattr(val, "units") else None
+            #     val = val.magnitude if units is not None else val
+            #     sec_atomsgroup.x_h5md_parameters.append(
+            #         ParamEntry(kind=particles_group_key, value=val, unit=units)
+            #     )
+            # get the next atomsgroup
+            if particles_subgroup:
+                self.parse_system_hierarchy(
+                    sec_atomsgroup,
+                    particles_subgroup,
+                    f"{path_particlesgroup_key}.particles_group",
+                )
 
     # TODO move this function to the MDParser class
     def parse_trajectory_step2(self, data: Dict[str, Any], simulation, topology, path_topology) -> None:
@@ -901,6 +907,7 @@ class H5MDParser(MDParser):
             return
 
         model_system = ModelSystem()
+        ## Populate the archive directly ##
         # atoms_dict_keys = [ 'is_representative', 'step'?, 'time', 'positions', 'n_atoms', 'labels', 'velocities', 'dimension', 'periodic', 'lattice_vectors' ]
         # model_system.is_representative = data.get("is_representative")
         # # model_system.time_step = data.get("step")  # TODO change time_step to step
@@ -921,21 +928,29 @@ class H5MDParser(MDParser):
         # atomic_cell.positions = data.get("positions")
         # atomic_cell.velocities = data.get("velocities")
 
+        ## Populate the archive using parse_section() ##
         # TODO re-define data (actually system_info) so that we can use parse_section()
+        # @BM - you don't need to worry about the re-mapping, I can go into system_info later and do this
+        # you can just use the dictionary defined here if needed
         data["model_system"] = {}
-        data["atomic_cell"]["AtomicCell"]["n_atoms"] = data.pop("n_atoms")
-        data["atomic_cell"]["AtomicCell"]["lattice_vectors"] = data.pop("lattice_vectors")
-        data["atomic_cell"]["AtomicCell"]["periodice_boundary_conditions"] = data.pop("periodic")
-        data["atomic_cell"]["AtomicCell"]["positions"] = data.pop("positions")
-        data["atomic_cell"]["AtomicCell"]["velocities"] = data.pop("velocities")
-        self.parse_section(data, model_system)
+        data["model_system"]["is_representative"] = data.pop("is_representative")
+        data["model_system"]["time_step"] = data.pop("time").magnitude
+        data["model_system"]["dimensionality"] = data.pop("dimension")
+        self.parse_section(data["model_system"], model_system)
         atomic_cell = AtomicCell()
         model_system.cell.append(atomic_cell)
-
+        data["atomic_cell"] = {}
+        data["atomic_cell"]["n_atoms"] = data.pop("n_atoms")
+        data["atomic_cell"]["lattice_vectors"] = data.pop("lattice_vectors")
+        data["atomic_cell"]["periodice_boundary_conditions"] = data.pop("periodic")
+        data["atomic_cell"]["positions"] = data.pop("positions")
+        data["atomic_cell"]["velocities"] = data.pop("velocities")
+        self.parse_section(data["atomic_cell"], atomic_cell)
         simulation.model_system.append(model_system)
 
-        # if data.get("is_representative") and topology:
-        #     self.parse_system_hierarchy(model_system, topology, path_topology)
+        # @BM - here is where we will create the system hierarchy
+        if simulation.model_system[-1].is_representative and topology:
+            self.parse_system_hierarchy(model_system, topology, path_topology)
 
         return model_system
 
@@ -967,7 +982,7 @@ class H5MDParser(MDParser):
                 path_topology = "connectivity.particles_group"
                 topology = self._data_parser.get(path_topology)
 
-            self.parse_trajectory_step2(atoms_dict, simulation, topology, path_topology)
+            self.parse_trajectory_step2(atoms_dict, simulation, topology, path_topology)  # TODO reassess passing of top and path_top here
 
             # if i_step == 0 and topology:  # TODO extend to time-dependent topologies
             #     self.parse_atomsgroup(sec_run.system[i_step], topology, path_topology)
@@ -1012,7 +1027,7 @@ class H5MDParser(MDParser):
 
         # self.parse_method()
 
-        # self.parse_system()
+        self.parse_system()  ## @BM uncomment to run the old parsing of system, or comment to test the new schema faster
 
         # self.parse_calculation()
 
