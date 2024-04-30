@@ -845,6 +845,134 @@ class H5MDParser(MDParser):
 
         return group_h5md_dict
 
+    # def parse_system_hierarchy(
+    #     self,
+    #     nomad_sec: ModelSystem,
+    #     h5md_sec_particlesgroup: Group,
+    #     path_particlesgroup: str,
+    # ):
+    #     for i_key, key in enumerate(h5md_sec_particlesgroup.keys()):
+    #         path_particlesgroup_key = f"{path_particlesgroup}.{key}"
+    #         particles_group = {
+    #             group_key: self._data_parser.get(
+    #                 f"{path_particlesgroup_key}.{group_key}"
+    #             )
+    #             for group_key in h5md_sec_particlesgroup[key].keys()
+    #         }
+    #         sec_atomsgroup = ModelSystem()
+    #         nomad_sec.atoms_group.append(sec_atomsgroup)
+    #         sec_atomsgroup.type = particles_group.pop("type", None)
+    #         sec_atomsgroup.index = i_key
+    #         sec_atomsgroup.atom_indices = particles_group.pop("indices", None)
+    #         sec_atomsgroup.n_atoms = (
+    #             len(sec_atomsgroup.atom_indices)
+    #             if sec_atomsgroup.atom_indices is not None
+    #             else None
+    #         )
+    #         sec_atomsgroup.is_molecule = particles_group.pop("is_molecule", None)
+    #         sec_atomsgroup.label = particles_group.pop("label", None)
+    #         sec_atomsgroup.composition_formula = particles_group.pop("formula", None)
+    #         particles_subgroup = particles_group.pop("particles_group", None)
+    #         # set the remaining attributes
+    #         for particles_group_key in particles_group.keys():
+    #             val = particles_group.get(particles_group_key)
+    #             units = val.units if hasattr(val, "units") else None
+    #             val = val.magnitude if units is not None else val
+    #             sec_atomsgroup.x_h5md_parameters.append(
+    #                 ParamEntry(kind=particles_group_key, value=val, unit=units)
+    #             )
+    #         # get the next atomsgroup
+    #         if particles_subgroup:
+    #             self.parse_system_hierarchy(
+    #                 sec_atomsgroup,
+    #                 particles_subgroup,
+    #                 f"{path_particlesgroup_key}.particles_group",
+                # )
+
+    # TODO move this function to the MDParser class
+    def parse_trajectory_step2(self, data: Dict[str, Any], simulation, topology, path_topology) -> None:
+        '''
+        Create a system section and write the provided data.
+        '''
+        if self.archive is None:
+            return
+
+        if (step := data.get('step')) is not None and step not in self.trajectory_steps:
+            return
+
+        model_system = ModelSystem()
+        # atoms_dict_keys = [ 'is_representative', 'step'?, 'time', 'positions', 'n_atoms', 'labels', 'velocities', 'dimension', 'periodic', 'lattice_vectors' ]
+        # model_system.is_representative = data.get("is_representative")
+        # # model_system.time_step = data.get("step")  # TODO change time_step to step
+        # model_system.time_step = data.get("time").magnitude  # TODO add time to schema
+        # # ! It's a bit unclear still how we are dealing with steps and time in system, will come back to these TODOs
+        # model_system.dimensionality = data.get("dimension")
+        # atomic_cell = AtomicCell()
+        # model_system.cell.append(atomic_cell)
+        # atomic_cell.n_atoms = data.get("n_atoms")
+        # atomic_cell.lattice_vectors = data.get('lattice_vectors')
+        # atomic_cell.periodic_boundary_conditions = data.get('periodic')
+        # # labels = structure.get("labels")
+        # # ! it is a bit unfortunate that we have to assign these states individually per atom
+        # # ! since we already have to do this once in methods (I believe)
+        # for label in data.get("labels"):
+        #     atoms_state = AtomsState(chemical_symbol=label)
+        #     atomic_cell.atoms_state.append(atoms_state)
+        # atomic_cell.positions = data.get("positions")
+        # atomic_cell.velocities = data.get("velocities")
+
+        # TODO re-define data (actually system_info) so that we can use parse_section()
+        data["model_system"] = {}
+        data["atomic_cell"]["AtomicCell"]["n_atoms"] = data.pop("n_atoms")
+        data["atomic_cell"]["AtomicCell"]["lattice_vectors"] = data.pop("lattice_vectors")
+        data["atomic_cell"]["AtomicCell"]["periodice_boundary_conditions"] = data.pop("periodic")
+        data["atomic_cell"]["AtomicCell"]["positions"] = data.pop("positions")
+        data["atomic_cell"]["AtomicCell"]["velocities"] = data.pop("velocities")
+        self.parse_section(data, model_system)
+        atomic_cell = AtomicCell()
+        model_system.cell.append(atomic_cell)
+
+        simulation.model_system.append(model_system)
+
+        # if data.get("is_representative") and topology:
+        #     self.parse_system_hierarchy(model_system, topology, path_topology)
+
+        return model_system
+
+
+    def parse_system2(self, simulation):
+
+
+        system_info = self._system_info.get("system")
+        if not system_info:
+            self.logger.error("No particle information found in H5MD file.")
+            return
+
+        self._system_time_map = {}
+        for i_step, step in enumerate(self.trajectory_steps):
+            atoms_dict = system_info[step]
+            atoms_dict["is_representative"] = False
+
+            atom_labels = atoms_dict.get("labels")
+            if atom_labels is not None:
+                try:
+                    symbols2numbers(atom_labels)
+                except KeyError:  # TODO this check should be moved to the system normalizer in the new schema
+                    atoms_dict["labels"] = ["X"] * len(atom_labels)
+
+            topology = None
+            if i_step == 0:  # TODO extend to time-dependent bond lists and topologies
+                atoms_dict["is_representative"] = True
+                atoms_dict["bond_list"] = self._data_parser.get("connectivity.bonds")
+                path_topology = "connectivity.particles_group"
+                topology = self._data_parser.get(path_topology)
+
+            self.parse_trajectory_step2(atoms_dict, simulation, topology, path_topology)
+
+            # if i_step == 0 and topology:  # TODO extend to time-dependent topologies
+            #     self.parse_atomsgroup(sec_run.system[i_step], topology, path_topology)
+
+
     def write_to_archive(self) -> None:
         self._maindir = os.path.dirname(self.mainfile)
         self._h5md_files = os.listdir(self._maindir)
@@ -865,8 +993,8 @@ class H5MDParser(MDParser):
 
         self.parse_atom_parameters()
         self.parse_system_info()
-        self.parse_observable_info()
-        self.parse_parameter_info()
+        # self.parse_observable_info()
+        # self.parse_parameter_info()
 
         ###########################
         # Populate the OLD SCHEMA #
@@ -882,35 +1010,37 @@ class H5MDParser(MDParser):
             name=group_h5md_dict.get('h5md_creator_name'), version=group_h5md_dict.get('h5md_creator_version')
         )
 
-        self.parse_method()
+        # self.parse_method()
 
-        self.parse_system()
+        # self.parse_system()
 
-        self.parse_calculation()
+        # self.parse_calculation()
 
-        self.parse_workflow()
+        # self.parse_workflow()
 
 
         ###########################
         # Populate the NEW SCHEMA #
         ###########################
-        # simulation = Simulation()
-        # simulation.program = BaseProgram(
-        #     name=group_h5md_dict.get('program_name'),
-        #     version=group_h5md_dict.get('program_version')
-        # )
-        # simulation.x_h5md_version = group_h5md_dict.get('h5md_version')
-        # simulation.x_h5md_author = Author2(
-        #     name=group_h5md_dict.get('h5md_author_name'), email=group_h5md_dict.get('h5md_author_email')
-        # )
-        # simulation.x_h5md_creator = BaseProgram(
-        #     name=group_h5md_dict.get('h5md_creator_name'), version=group_h5md_dict.get('h5md_creator_version')
-        # )
+        simulation = Simulation()
+        simulation.program = BaseProgram(
+            name=group_h5md_dict.get('program_name'),
+            version=group_h5md_dict.get('program_version')
+        )
+        simulation.x_h5md_version = group_h5md_dict.get('h5md_version')
+        simulation.x_h5md_author = Author2(
+            name=group_h5md_dict.get('h5md_author_name'), email=group_h5md_dict.get('h5md_author_email')
+        )
+        simulation.x_h5md_creator = BaseProgram(
+            name=group_h5md_dict.get('h5md_creator_name'), version=group_h5md_dict.get('h5md_creator_version')
+        )
 
-        # # model_system = self.parse_system(simulation)
+        self.parse_system2(simulation)
         # # simulation.model_system.append(model_system)
         # # self.parse_method(simulation)
         # # self.parse_winput(simulation)
         # # self.parse_output(simulation)
-        # self.archive.m_add_sub_section(EntryArchive.data, simulation)
+
+
+        self.archive.m_add_sub_section(EntryArchive.data, simulation)
 
