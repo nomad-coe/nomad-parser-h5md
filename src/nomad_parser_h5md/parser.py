@@ -948,7 +948,6 @@ class H5MDParser(MDParser):
         self.parse_section(data["atomic_cell"], atomic_cell)
         simulation.model_system.append(model_system)
 
-        # @BM - here is where we will create the system hierarchy
         if simulation.model_system[-1].is_representative and topology:
             self.parse_system_hierarchy(model_system, topology, path_topology)
 
@@ -1027,7 +1026,7 @@ class H5MDParser(MDParser):
 
         # self.parse_method()
 
-        self.parse_system()  ## @BM uncomment to run the old parsing of system, or comment to test the new schema faster
+        self.parse_system()
 
         # self.parse_calculation()
 
