@@ -850,13 +850,11 @@ class H5MDParser(MDParser):
         nomad_sec: ModelSystem,
         h5md_sec_particlesgroup: Group,
         path_particlesgroup: str,
+        branch_depth: int,
     ):
 
-    # @BM - below is an amended version of the old function for creating the atoms_group hierarchy
-    # The necessary changes have already been made to create the appropriate hierarchy
-    # You could now try to the quantities: branch_label, branch_depth, atom_indices, bond_list (optional)
-    # later I can add some missing quantities from the old schema like: is_molecule, composition
-
+        data = {}
+        branch_depth += 1
         for i_key, key in enumerate(h5md_sec_particlesgroup.keys()):
             path_particlesgroup_key = f"{path_particlesgroup}.{key}"
             particles_group = {
@@ -867,16 +865,18 @@ class H5MDParser(MDParser):
             }
             sec_atomsgroup = ModelSystem()
             nomad_sec.model_system.append(sec_atomsgroup)
-            # sec_atomsgroup.type = particles_group.pop("type", None)
+            data["branch_label"] = particles_group.pop("label", None)
+            data["branch_depth"] = branch_depth
+            data["atom_indices"] = particles_group.pop("indices", None)
+            # sec_atomsgroup.type = particles_group.pop("type", None) #? deprecate?
             # sec_atomsgroup.index = i_key
-            # sec_atomsgroup.atom_indices = particles_group.pop("indices", None)
+            # sec_atomsgroup.atom_indices =  #! deprecate!
             # sec_atomsgroup.n_atoms = (
             #     len(sec_atomsgroup.atom_indices)
             #     if sec_atomsgroup.atom_indices is not None
             #     else None
             # )
-            # sec_atomsgroup.is_molecule = particles_group.pop("is_molecule", None)
-            # sec_atomsgroup.label = particles_group.pop("label", None)
+            # sec_atomsgroup.is_molecule = particles_group.pop("is_molecule", None) #? deprecate?
             # sec_atomsgroup.composition_formula = particles_group.pop("formula", None)
             particles_subgroup = particles_group.pop("particles_group", None)
             # set the remaining attributes
@@ -888,11 +888,13 @@ class H5MDParser(MDParser):
             #         ParamEntry(kind=particles_group_key, value=val, unit=units)
             #     )
             # get the next atomsgroup
+            self.parse_section(data, sec_atomsgroup)
             if particles_subgroup:
                 self.parse_system_hierarchy(
                     sec_atomsgroup,
                     particles_subgroup,
                     f"{path_particlesgroup_key}.particles_group",
+                    branch_depth=branch_depth
                 )
 
     # TODO move this function to the MDParser class
@@ -930,12 +932,14 @@ class H5MDParser(MDParser):
 
         ## Populate the archive using parse_section() ##
         # TODO re-define data (actually system_info) so that we can use parse_section()
-        # @BM - you don't need to worry about the re-mapping, I can go into system_info later and do this
-        # you can just use the dictionary defined here if needed
         data["model_system"] = {}
+        data["model_system"]["branch_label"] = "Total System"  #? Do we or should we have a default name for the entire system?
+        data["model_system"]["branch_depth"] = 0
+        # data["model_system"]["atom_indices"] =  #? This is redundant to populate for the entire system, is there any benefit?
         data["model_system"]["is_representative"] = data.pop("is_representative")
         data["model_system"]["time_step"] = data.pop("time").magnitude
         data["model_system"]["dimensionality"] = data.pop("dimension")
+        data["model_system"]["bond_list"] = data.get("bond_list")
         self.parse_section(data["model_system"], model_system)
         atomic_cell = AtomicCell()
         model_system.cell.append(atomic_cell)
@@ -945,11 +949,17 @@ class H5MDParser(MDParser):
         data["atomic_cell"]["periodice_boundary_conditions"] = data.pop("periodic")
         data["atomic_cell"]["positions"] = data.pop("positions")
         data["atomic_cell"]["velocities"] = data.pop("velocities")
+        # ! it is a bit unfortunate that we have to assign these states individually per atom
+        # ! since we already have to do this once in methods (I believe)
+        for label in data.pop("labels"):
+            atoms_state = AtomsState(chemical_symbol=label)
+            atomic_cell.atoms_state.append(atoms_state)
+
         self.parse_section(data["atomic_cell"], atomic_cell)
         simulation.model_system.append(model_system)
 
         if simulation.model_system[-1].is_representative and topology:
-            self.parse_system_hierarchy(model_system, topology, path_topology)
+            self.parse_system_hierarchy(model_system, topology, path_topology, branch_depth=0)
 
         return model_system
 
@@ -971,6 +981,7 @@ class H5MDParser(MDParser):
             if atom_labels is not None:
                 try:
                     symbols2numbers(atom_labels)
+                    atoms_dict["labels"] = atom_labels
                 except KeyError:  # TODO this check should be moved to the system normalizer in the new schema
                     atoms_dict["labels"] = ["X"] * len(atom_labels)
 
