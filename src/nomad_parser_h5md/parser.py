@@ -56,7 +56,7 @@ from ase.symbols import symbols2numbers
 
 # New schema
 from nomad_simulations import Simulation, Program as BaseProgram
-from nomad_simulations.model_system import ModelSystem, AtomicCell
+from nomad_simulations.model_system import AtomicCell
 from nomad_simulations.atoms_state import (
     AtomsState,
     HubbardInteractions,
@@ -64,7 +64,7 @@ from nomad_simulations.atoms_state import (
     OrbitalsState,
 )
 
-from .schema2 import Author as Author2
+from .schema2 import Author as Author2, ModelSystem
 
 class HDF5Parser(FileParser):
     def __init__(self):
@@ -855,7 +855,7 @@ class H5MDParser(MDParser):
 
         data = {}
         branch_depth += 1
-        for i_key, key in enumerate(h5md_sec_particlesgroup.keys()):
+        for key in h5md_sec_particlesgroup.keys():
             path_particlesgroup_key = f"{path_particlesgroup}.{key}"
             particles_group = {
                 group_key: self._data_parser.get(
@@ -863,35 +863,33 @@ class H5MDParser(MDParser):
                 )
                 for group_key in h5md_sec_particlesgroup[key].keys()
             }
-            sec_atomsgroup = ModelSystem()
-            nomad_sec.model_system.append(sec_atomsgroup)
+            sec_model_system = ModelSystem()
+            nomad_sec.model_system.append(sec_model_system)
             data["branch_label"] = particles_group.pop("label", None)
             data["branch_depth"] = branch_depth
             data["atom_indices"] = particles_group.pop("indices", None)
             # sec_atomsgroup.type = particles_group.pop("type", None) #? deprecate?
-            # sec_atomsgroup.index = i_key
-            # sec_atomsgroup.atom_indices =  #! deprecate!
-            # sec_atomsgroup.n_atoms = (
-            #     len(sec_atomsgroup.atom_indices)
-            #     if sec_atomsgroup.atom_indices is not None
-            #     else None
-            # )
+            particles_group.pop("type", None)
             # sec_atomsgroup.is_molecule = particles_group.pop("is_molecule", None) #? deprecate?
-            # sec_atomsgroup.composition_formula = particles_group.pop("formula", None)
+            particles_group.pop("is_molecule", None)
+            particles_group.pop("formula", None) # covered in normalization now
+            # write all the standard quantities to the archive
+            self.parse_section(data, sec_model_system)
             particles_subgroup = particles_group.pop("particles_group", None)
+
             # set the remaining attributes
-            # for particles_group_key in particles_group.keys():
-            #     val = particles_group.get(particles_group_key)
-            #     units = val.units if hasattr(val, "units") else None
-            #     val = val.magnitude if units is not None else val
-            #     sec_atomsgroup.x_h5md_parameters.append(
-            #         ParamEntry(kind=particles_group_key, value=val, unit=units)
-            #     )
-            # get the next atomsgroup
-            self.parse_section(data, sec_atomsgroup)
+            for particles_group_key in particles_group.keys():
+                val = particles_group.get(particles_group_key)
+                units = val.units if hasattr(val, "units") else None
+                val = val.magnitude if units is not None else val
+                sec_model_system.custom_system_attributes.append(
+                    ParamEntry(kind=particles_group_key, value=val, unit=units)
+                )
+
+            # get the next branch level
             if particles_subgroup:
                 self.parse_system_hierarchy(
-                    sec_atomsgroup,
+                    sec_model_system,
                     particles_subgroup,
                     f"{path_particlesgroup_key}.particles_group",
                     branch_depth=branch_depth
@@ -1037,7 +1035,7 @@ class H5MDParser(MDParser):
 
         # self.parse_method()
 
-        self.parse_system()
+        # self.parse_system()
 
         # self.parse_calculation()
 

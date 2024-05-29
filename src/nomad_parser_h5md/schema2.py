@@ -17,6 +17,7 @@
 # limitations under the License.
 #
 
+import nomad_simulations.model_system
 import numpy as np
 from nomad.metainfo import Quantity, SubSection, SectionProxy, MEnum, Section, Context
 from nomad.datamodel.data import ArchiveSection
@@ -24,38 +25,44 @@ import nomad_simulations
 
 
 
-# class ParamEntry(ArchiveSection):
-#     """
-#     Generic section defining a parameter name and value
-#     """
+class ParamEntry(ArchiveSection):
+    """
+    Generic section defining a parameter name and value
+    """
 
-#     m_def = Section(validate=False)
+    m_def = Section(validate=False)
 
-#     kind = Quantity(
-#         type=str,
-#         shape=[],
-#         description="""
-#         Name of the parameter.
-#         """,
-#     )
+    kind = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Name of the parameter.
+        """,
+    )
 
-#     value = Quantity(
-#         type=str,
-#         shape=[],
-#         description="""
-#         Value of the parameter as a string.
-#         """,
-#     )
+    value = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Value of the parameter as a string.
+        """,
+    )
 
-#     unit = Quantity(
-#         type=str,
-#         shape=[],
-#         description="""
-#         Unit of the parameter as a string.
-#         """,
-#     )
+    unit = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Unit of the parameter as a string.
+        """,
+    )
 
-#     # TODO add description quantity
+    description = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Further description of the attribute.
+        """,
+    )
 
 
 # class CalcEntry(ArchiveSection):
@@ -122,26 +129,20 @@ import nomad_simulations
 #     )
 
 
-# class AtomsGroup(runschema.system.AtomsGroup):
-#     """
-#     Describes a group of atoms which may constitute a sub system as in the case of a
-#     molecule.
-#     """
+class ModelSystem(nomad_simulations.model_system.ModelSystem):
+    """
+    Model system used as an input for simulating the material.
+    """
 
-#     m_def = Section(
-#         validate=False,
-#         extends_base_section=True,
-#     )
-
-#     x_h5md_parameters = (
-#         SubSection(  # TODO should this be called parameters or attributes or what?
-#             sub_section=ParamEntry.m_def,
-#             description="""
-#         Contains additional information about the atom group .
-#         """,
-#             repeats=True,
-#         )
-#     )
+    custom_system_attributes = (
+        SubSection(  # TODO should this be called parameters or attributes or what?
+            sub_section=ParamEntry.m_def,
+            description="""
+        Contains additional information about the (sub)system .
+        """,
+            repeats=True,
+        )
+    )
 
 
 # class Calculation(runschema.calculation.Calculation):
