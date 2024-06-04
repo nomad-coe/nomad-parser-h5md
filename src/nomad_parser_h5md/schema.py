@@ -16,28 +16,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import numpy as np  # pylint: disable=unused-import
 import typing  # pylint: disable=unused-import
-from nomad.metainfo import (  # pylint: disable=unused-import
-    MSection,
-    MCategory,
-    Category,
-    Package,
-    Quantity,
-    Section,
-    SubSection,
-    SectionProxy,
-    Reference,
-)
-import runschema.run  # pylint: disable=unused-import
+
+import numpy as np  # pylint: disable=unused-import
 import runschema.calculation  # pylint: disable=unused-import
 import runschema.method  # pylint: disable=unused-import
+import runschema.run  # pylint: disable=unused-import
 import runschema.system  # pylint: disable=unused-import
-
+from nomad.metainfo import (  # pylint: disable=unused-import
+    Category,
+    MCategory,
+    MSection,
+    Package,
+    Quantity,
+    Reference,
+    Section,
+    SectionProxy,
+    SubSection,
+)
 
 m_package = Package()
 
 # TODO update this entire schema!
+
 
 class ParamEntry(MSection):
     """
@@ -231,4 +232,3 @@ class Run(runschema.run.Run):
     x_h5md_author = SubSection(sub_section=Author.m_def)
 
     x_h5md_creator = SubSection(sub_section=runschema.run.Program.m_def)
-

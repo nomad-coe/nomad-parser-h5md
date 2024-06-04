@@ -17,12 +17,11 @@
 # limitations under the License.
 #
 
+import nomad_simulations
 import nomad_simulations.model_system
 import numpy as np
-from nomad.metainfo import Quantity, SubSection, SectionProxy, MEnum, Section, Context
 from nomad.datamodel.data import ArchiveSection
-import nomad_simulations
-
+from nomad.metainfo import Context, MEnum, Quantity, Section, SectionProxy, SubSection
 
 
 class ParamEntry(ArchiveSection):
@@ -215,4 +214,3 @@ class Simulation(nomad_simulations.Simulation):
     x_h5md_author = SubSection(sub_section=Author.m_def)
 
     x_h5md_creator = SubSection(sub_section=nomad_simulations.Program.m_def)
-

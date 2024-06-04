@@ -16,15 +16,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import sys
 import json
 import logging
+import sys
 
-from nomad.utils import configure_logging
 from nomad.datamodel import EntryArchive
+from nomad.utils import configure_logging
 from nomadparserh5md.parser import H5MDParser
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     configure_logging(console_log_level=logging.DEBUG)
     archive = EntryArchive()
     H5MDParser().parse(sys.argv[1], archive, logging)
