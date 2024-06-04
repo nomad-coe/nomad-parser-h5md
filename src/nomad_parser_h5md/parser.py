@@ -178,6 +178,7 @@ class H5MDParser(MDParser):
         self._n_atoms = None
         self._atom_parameters = None
         self._system_info = None
+        self._system_info2 = None
         self._observable_info = None
         self._parameter_info = None
         self._time_unit = ureg.picosecond
@@ -195,10 +196,26 @@ class H5MDParser(MDParser):
             "charge": "charge",
         }
 
+        self._nomad_to_particles_group_map2 = {
+            "positions": "position",
+            "velocities": "velocity",
+            "forces": "force",
+            "labels": "species_label",
+            "label": "force_field_label",
+            "mass": "mass",
+            "charge": "charge",
+        }
+
         self._nomad_to_box_group_map = {
             "lattice_vectors": "edges",
             "periodic": "boundary",
             "dimension": "dimension",
+        }
+
+        self._nomad_to_box_group_map2 = {
+            "lattice_vectors": "edges",
+            "periodic_boundary_conditions": "boundary",
+            "dimensionality": "dimension",
         }
 
     def parse_atom_parameters(self):
@@ -319,6 +336,101 @@ class H5MDParser(MDParser):
                 if val is not None
             }
             self._system_info["calculation"][step] = {
+                key: val[i_step]
+                for key, val in values_dict["calculation"].items()
+                if val is not None
+            }
+
+    def parse_system_info2(self):
+        self._system_info2 = {"system": {}, "calculation": {}}
+        particles_group = self._data_parser.get(self._path_group_particles_all)
+        positions = self._data_parser.get(self._path_value_positions_all)
+        n_frames = self._n_frames
+        if (
+            particles_group is None or positions is None or positions is None
+        ):  # For now we require that positions are present in the H5MD file to store other particle attributes
+            self.logger.warning(
+                "No positions available in H5MD file."
+                " Other particle attributes will not be stored"
+            )
+            return self._system_info2
+
+        def get_value(value, steps, path=""):
+            if value is None:
+                return value
+            if isinstance(value, h5py.Group):
+                value = self._data_parser.get(f"{path}.value" if path else "value")
+                path_step = f"{path}.step" if path else "step"
+                attr_steps = self._data_parser.get(path_step)
+                if value is None or attr_steps is None:
+                    self.logger.warning(
+                        "Missing values or steps in particle attributes."
+                        " These attributes will not be stored."
+                    )
+                    return None
+                elif sorted(attr_steps) != sorted(steps):
+                    self.logger.warning(
+                        "Distinct trajectory lengths of particle attributes not supported."
+                        " These attributes will not be stored."
+                    )
+                    return None
+                else:
+                    return value
+            else:
+                return [value] * n_frames
+
+        # get the steps based on the positions
+        steps = self._data_parser.get(f"{self._path_group_positions_all}.step")
+        if steps is None:
+            self.logger.warning(
+                "No step information available in H5MD file."
+                " System information cannot be parsed."
+            )
+            return self._system_info2
+        self.trajectory_steps = steps
+
+        # get the rest of the particle quantities
+        values_dict = {"system": {}, "calculation": {}}
+        times = self._data_parser.get(f"{self._path_group_positions_all}.time")
+        values_dict["system"]["time"] = times
+        values_dict["calculation"]["time"] = times
+        values_dict["system"]["positions"] = positions
+        values_dict["system"]["n_atoms"] = self._n_atoms
+        system_keys = {
+            "labels": "system",
+            "velocities": "system",
+            "forces": "calculation",
+        }
+        for key, sec_key in system_keys.items():
+            path = f"{self._path_group_particles_all}.{self._nomad_to_particles_group_map2[key]}"
+            value = self._data_parser.get(path)
+            values_dict[sec_key][key] = get_value(value, steps, path=path)
+
+        # get the box quantities
+        box = self._data_parser.get(f"{self._path_group_particles_all}.box")
+        if box is not None:
+            box_attributes = ["dimensionality", "periodic_boundary_conditions"]
+            for box_key in box_attributes:
+                value = self._data_parser.get(
+                    f"{self._path_group_particles_all}.box.{self._nomad_to_box_group_map2[box_key]}",
+                    isattr=True,
+                )
+                values_dict["system"][box_key] = (
+                    [value] * n_frames if value is not None else None
+                )
+
+            box_key = "lattice_vectors"
+            path = f"{self._path_group_particles_all}.box.{self._nomad_to_box_group_map2[box_key]}"
+            value = self._data_parser.get(path)
+            values_dict["system"][box_key] = get_value(value, steps, path=path)
+        # populate the dictionary
+        for i_step, step in enumerate(steps):
+            self._system_info2["system"][step] = {
+                key: val[i_step]
+                for key, val in values_dict["system"].items()
+                if val is not None
+            }
+            self._system_info2["calculation"][step] = {
                 key: val[i_step]
                 for key, val in values_dict["calculation"].items()
                 if val is not None
@@ -850,11 +962,9 @@ class H5MDParser(MDParser):
         nomad_sec: ModelSystem,
         h5md_sec_particlesgroup: Group,
         path_particlesgroup: str,
-        branch_depth: int,
     ):
 
         data = {}
-        branch_depth += 1
         for key in h5md_sec_particlesgroup.keys():
             path_particlesgroup_key = f"{path_particlesgroup}.{key}"
             particles_group = {
@@ -866,7 +976,6 @@ class H5MDParser(MDParser):
             sec_model_system = ModelSystem()
             nomad_sec.model_system.append(sec_model_system)
             data["branch_label"] = particles_group.pop("label", None)
-            data["branch_depth"] = branch_depth
             data["atom_indices"] = particles_group.pop("indices", None)
             # sec_atomsgroup.type = particles_group.pop("type", None) #? deprecate?
             particles_group.pop("type", None)
@@ -891,8 +1000,7 @@ class H5MDParser(MDParser):
                 self.parse_system_hierarchy(
                     sec_model_system,
                     particles_subgroup,
-                    f"{path_particlesgroup_key}.particles_group",
-                    branch_depth=branch_depth
+                    f"{path_particlesgroup_key}.particles_group"
                 )
 
     # TODO move this function to the MDParser class
@@ -930,42 +1038,54 @@ class H5MDParser(MDParser):
 
         ## Populate the archive using parse_section() ##
         # TODO re-define data (actually system_info) so that we can use parse_section()
-        data["model_system"] = {}
-        data["model_system"]["branch_label"] = "Total System"  #? Do we or should we have a default name for the entire system?
-        data["model_system"]["branch_depth"] = 0
-        # data["model_system"]["atom_indices"] =  #? This is redundant to populate for the entire system, is there any benefit?
-        data["model_system"]["is_representative"] = data.pop("is_representative")
-        data["model_system"]["time_step"] = data.pop("time").magnitude
-        data["model_system"]["dimensionality"] = data.pop("dimension")
-        data["model_system"]["bond_list"] = data.get("bond_list")
-        self.parse_section(data["model_system"], model_system)
+        # data["model_system"] = {}
+        # data["model_system"]["branch_label"] = "Total System"  #? Do we or should we have a default name for the entire system?
+        # data["model_system"]["is_representative"] = data.pop("is_representative")
+        # data["model_system"]["time_step"] = data.pop("time").magnitude
+        # data["model_system"]["dimensionality"] = data.pop("dimension")
+        # data["model_system"]["bond_list"] = data.get("bond_list")
+        # self.parse_section(data["model_system"], model_system)
+        # atomic_cell = AtomicCell()
+        # model_system.cell.append(atomic_cell)
+        # data["atomic_cell"] = {}
+        # data["atomic_cell"]["n_atoms"] = data.pop("n_atoms")
+        # data["atomic_cell"]["lattice_vectors"] = data.pop("lattice_vectors")
+        # data["atomic_cell"]["periodice_boundary_conditions"] = data.pop("periodic")
+        # data["atomic_cell"]["positions"] = data.pop("positions")
+        # data["atomic_cell"]["velocities"] = data.pop("velocities")
+        # # ! it is a bit unfortunate that we have to assign these states individually per atom
+        # # ! since we already have to do this once in methods (I believe)
+        # for label in data.pop("labels"):
+        #     atoms_state = AtomsState(chemical_symbol=label)
+        #     atomic_cell.atoms_state.append(atoms_state)
+
+        # self.parse_section(data["atomic_cell"], atomic_cell)
+        # simulation.model_system.append(model_system)
+
+        # if simulation.model_system[-1].is_representative and topology:
+        #     self.parse_system_hierarchy(model_system, topology, path_topology, branch_depth=0)
+
+        ## Populate now using system_info2 ##
         atomic_cell = AtomicCell()
-        model_system.cell.append(atomic_cell)
-        data["atomic_cell"] = {}
-        data["atomic_cell"]["n_atoms"] = data.pop("n_atoms")
-        data["atomic_cell"]["lattice_vectors"] = data.pop("lattice_vectors")
-        data["atomic_cell"]["periodice_boundary_conditions"] = data.pop("periodic")
-        data["atomic_cell"]["positions"] = data.pop("positions")
-        data["atomic_cell"]["velocities"] = data.pop("velocities")
-        # ! it is a bit unfortunate that we have to assign these states individually per atom
-        # ! since we already have to do this once in methods (I believe)
-        for label in data.pop("labels"):
+        atomic_cell_dict = data.pop("atomic_cell")
+        atom_labels = atomic_cell_dict.pop("labels")
+        for label in atom_labels:
             atoms_state = AtomsState(chemical_symbol=label)
             atomic_cell.atoms_state.append(atoms_state)
-
-        self.parse_section(data["atomic_cell"], atomic_cell)
+        self.parse_section(atomic_cell_dict, atomic_cell)
+        model_system.cell.append(atomic_cell)
+        self.parse_section(data, model_system)
         simulation.model_system.append(model_system)
 
         if simulation.model_system[-1].is_representative and topology:
-            self.parse_system_hierarchy(model_system, topology, path_topology, branch_depth=0)
+            self.parse_system_hierarchy(model_system, topology, path_topology)
 
         return model_system
 
 
     def parse_system2(self, simulation):
 
-
-        system_info = self._system_info.get("system")
+        system_info = self._system_info2.get("system")
         if not system_info:
             self.logger.error("No particle information found in H5MD file.")
             return
@@ -989,6 +1109,23 @@ class H5MDParser(MDParser):
                 atoms_dict["bond_list"] = self._data_parser.get("connectivity.bonds")
                 path_topology = "connectivity.particles_group"
                 topology = self._data_parser.get(path_topology)
+
+            # REMAP some of the data for the schema
+            atoms_dict["branch_label"] = "Total System"  #? Do we or should we have a default name for the entire system?
+            atoms_dict["time_step"] = atoms_dict.pop("time").magnitude  #TODO change in system_info
+            # atoms_dict["dimensionality"] = atoms_dict.pop("dimension")  #TODO change in system_info
+            atomic_cell_keys = ["n_atoms", "lattice_vectors", "periodic_boundary_conditions", "positions", "velocities", "labels"]
+            atoms_dict["atomic_cell"] = {}
+            for key in atomic_cell_keys:
+                atoms_dict["atomic_cell"][key] = atoms_dict.pop(key)
+            # atoms_dict["atomic_cell"]["n_atoms"] = atoms_dict.pop("n_atoms")
+            # atoms_dict["atomic_cell"]["lattice_vectors"] = atoms_dict.pop("lattice_vectors")
+            # atoms_dict["atomic_cell"]["periodic_boundary_conditions"] = atoms_dict.pop("periodic")
+            # atoms_dict["atomic_cell"]["positions"] = atoms_dict.pop("positions")
+            # atoms_dict["atomic_cell"]["velocities"] = atoms_dict.pop("velocities")
+            # atoms_dict["atomic_cell"]["atoms_state"] = []
+            # for label in atoms_dict.pop("labels"):
+            #     atoms_dict["atomic_cell"]["atoms_state"].append({"chemical_symbol": label})
 
             self.parse_trajectory_step2(atoms_dict, simulation, topology, path_topology)  # TODO reassess passing of top and path_top here
 
@@ -1016,6 +1153,7 @@ class H5MDParser(MDParser):
 
         self.parse_atom_parameters()
         self.parse_system_info()
+        self.parse_system_info2()
         # self.parse_observable_info()
         # self.parse_parameter_info()
 
@@ -1035,7 +1173,7 @@ class H5MDParser(MDParser):
 
         # self.parse_method()
 
-        # self.parse_system()
+        self.parse_system()
 
         # self.parse_calculation()
 
