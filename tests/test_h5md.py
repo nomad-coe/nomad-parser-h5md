@@ -118,20 +118,20 @@ def test_md(parser):
     assert sec_res[0].x_h5md_parameters[0].value == '0.13'
     assert sec_res[0].x_h5md_parameters[0].unit is None
 
-    # sec_calc = sec_run.calculation
-    # assert len(sec_calc) == 5
-    # assert np.shape(sec_calc[1].forces.total.value) == (31583, 3)
-    # assert sec_calc[1].forces.total.value[2100][2].to('newton').magnitude == approx(500.0)
-    # assert sec_calc[2].temperature.to('kelvin').magnitude == approx(300.0)
-    # assert len(sec_calc[1].x_h5md_custom_calculations) == 1
-    # assert sec_calc[1].x_h5md_custom_calculations[0].kind == 'custom_thermo'
-    # assert sec_calc[1].x_h5md_custom_calculations[0].value == approx(100.0)
-    # assert sec_calc[1].x_h5md_custom_calculations[0].unit == 'newton / angstrom ** 2'
-    # assert sec_calc[2].time.to('ps').magnitude == approx(2.0)
-    # assert sec_calc[2].energy.kinetic.value.to('kilojoule').magnitude == approx(2.0)
-    # assert sec_calc[2].energy.potential.value.to('kilojoule').magnitude == approx(1.0)
-    # assert sec_calc[1].energy.x_h5md_energy_contributions[0].kind == 'energy-custom'
-    # assert sec_calc[1].energy.x_h5md_energy_contributions[0].value.magnitude == approx(3000.0)
+    sec_calc = sec_run.calculation
+    assert len(sec_calc) == 5
+    assert np.shape(sec_calc[1].forces.total.value) == (31583, 3)
+    assert sec_calc[1].forces.total.value[2100][2].to('newton').magnitude == approx(500.0)
+    assert sec_calc[2].temperature.to('kelvin').magnitude == approx(300.0)
+    assert len(sec_calc[1].x_h5md_custom_calculations) == 1
+    assert sec_calc[1].x_h5md_custom_calculations[0].kind == 'custom_thermo'
+    assert sec_calc[1].x_h5md_custom_calculations[0].value == approx(100.0)
+    assert sec_calc[1].x_h5md_custom_calculations[0].unit == 'newton / angstrom ** 2'
+    assert sec_calc[2].time.to('ps').magnitude == approx(2.0)
+    assert sec_calc[2].energy.kinetic.value.to('kilojoule').magnitude == approx(2.0)
+    assert sec_calc[2].energy.potential.value.to('kilojoule').magnitude == approx(1.0)
+    assert sec_calc[1].energy.x_h5md_energy_contributions[0].kind == 'energy-custom'
+    assert sec_calc[1].energy.x_h5md_energy_contributions[0].value.magnitude == approx(3000.0)
 
     # sec_workflow = archive.workflow2
     # assert sec_workflow.m_def.name == 'MolecularDynamics'
@@ -212,32 +212,19 @@ def test_md(parser):
     sec_atoms_group = sec_systems[0].model_system
     assert len(sec_atoms_group) == 4
     assert sec_atoms_group[0].branch_label == 'group_1ZNF'
-    # assert sec_atoms_group[0].type == 'molecule_group'  # no longer supported, combine in branch label?
-    # assert sec_atoms_group[0].n_atoms == 423
     assert sec_atoms_group[0].atom_indices[159] == 159
-    # assert sec_atoms_group[0].is_molecule is False  # would this be useful?
     sec_proteins = sec_atoms_group[0].model_system
     assert len(sec_proteins) == 1
     assert sec_proteins[0].branch_label == '1ZNF'
-    # assert sec_proteins[0].type == 'molecule'
-    # assert sec_proteins[0].n_atoms == 423
     assert sec_proteins[0].atom_indices[400] == 400
-    # assert sec_proteins[0].is_molecule is True
     sec_res_group = sec_proteins[0].model_system
     assert len(sec_res_group) == 16
     assert sec_res_group[14].branch_label == 'group_SER'
-    # assert sec_res_group[14].type == 'monomer_group'
-    # assert sec_res_group[14].composition_formula == 'SER(3)'
-    # assert sec_res_group[14].n_atoms == 33
     assert sec_res_group[14].atom_indices[2] == 136
-    # assert sec_res_group[14].is_molecule is False
     sec_res = sec_res_group[14].model_system
     assert len(sec_res) == 3
     assert sec_res[0].branch_label == 'SER'
-    # assert sec_res[0].type == 'monomer'
-    # assert sec_res[0].n_atoms == 11
     assert sec_res[0].atom_indices[10] == 144
-    # assert sec_res[0].is_molecule is False
-    assert sec_res[0].custom_system_attributes[0].kind == 'hydrophobicity' #? Should we still allow this?
+    assert sec_res[0].custom_system_attributes[0].kind == 'hydrophobicity'
     assert sec_res[0].custom_system_attributes[0].value == '0.13'
     assert sec_res[0].custom_system_attributes[0].unit is None

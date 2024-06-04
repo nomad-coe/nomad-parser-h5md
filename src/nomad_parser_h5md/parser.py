@@ -977,6 +977,7 @@ class H5MDParser(MDParser):
             nomad_sec.model_system.append(sec_model_system)
             data["branch_label"] = particles_group.pop("label", None)
             data["atom_indices"] = particles_group.pop("indices", None)
+            # TODO remove the deprecated below from the test file
             # sec_atomsgroup.type = particles_group.pop("type", None) #? deprecate?
             particles_group.pop("type", None)
             # sec_atomsgroup.is_molecule = particles_group.pop("is_molecule", None) #? deprecate?
@@ -1004,7 +1005,7 @@ class H5MDParser(MDParser):
                 )
 
     # TODO move this function to the MDParser class
-    def parse_trajectory_step2(self, data: Dict[str, Any], simulation, topology, path_topology) -> None:
+    def parse_trajectory_step2(self, data: Dict[str, Any], simulation: Simulation) -> None:
         '''
         Create a system section and write the provided data.
         '''
@@ -1015,57 +1016,6 @@ class H5MDParser(MDParser):
             return
 
         model_system = ModelSystem()
-        ## Populate the archive directly ##
-        # atoms_dict_keys = [ 'is_representative', 'step'?, 'time', 'positions', 'n_atoms', 'labels', 'velocities', 'dimension', 'periodic', 'lattice_vectors' ]
-        # model_system.is_representative = data.get("is_representative")
-        # # model_system.time_step = data.get("step")  # TODO change time_step to step
-        # model_system.time_step = data.get("time").magnitude  # TODO add time to schema
-        # # ! It's a bit unclear still how we are dealing with steps and time in system, will come back to these TODOs
-        # model_system.dimensionality = data.get("dimension")
-        # atomic_cell = AtomicCell()
-        # model_system.cell.append(atomic_cell)
-        # atomic_cell.n_atoms = data.get("n_atoms")
-        # atomic_cell.lattice_vectors = data.get('lattice_vectors')
-        # atomic_cell.periodic_boundary_conditions = data.get('periodic')
-        # # labels = structure.get("labels")
-        # # ! it is a bit unfortunate that we have to assign these states individually per atom
-        # # ! since we already have to do this once in methods (I believe)
-        # for label in data.get("labels"):
-        #     atoms_state = AtomsState(chemical_symbol=label)
-        #     atomic_cell.atoms_state.append(atoms_state)
-        # atomic_cell.positions = data.get("positions")
-        # atomic_cell.velocities = data.get("velocities")
-
-        ## Populate the archive using parse_section() ##
-        # TODO re-define data (actually system_info) so that we can use parse_section()
-        # data["model_system"] = {}
-        # data["model_system"]["branch_label"] = "Total System"  #? Do we or should we have a default name for the entire system?
-        # data["model_system"]["is_representative"] = data.pop("is_representative")
-        # data["model_system"]["time_step"] = data.pop("time").magnitude
-        # data["model_system"]["dimensionality"] = data.pop("dimension")
-        # data["model_system"]["bond_list"] = data.get("bond_list")
-        # self.parse_section(data["model_system"], model_system)
-        # atomic_cell = AtomicCell()
-        # model_system.cell.append(atomic_cell)
-        # data["atomic_cell"] = {}
-        # data["atomic_cell"]["n_atoms"] = data.pop("n_atoms")
-        # data["atomic_cell"]["lattice_vectors"] = data.pop("lattice_vectors")
-        # data["atomic_cell"]["periodice_boundary_conditions"] = data.pop("periodic")
-        # data["atomic_cell"]["positions"] = data.pop("positions")
-        # data["atomic_cell"]["velocities"] = data.pop("velocities")
-        # # ! it is a bit unfortunate that we have to assign these states individually per atom
-        # # ! since we already have to do this once in methods (I believe)
-        # for label in data.pop("labels"):
-        #     atoms_state = AtomsState(chemical_symbol=label)
-        #     atomic_cell.atoms_state.append(atoms_state)
-
-        # self.parse_section(data["atomic_cell"], atomic_cell)
-        # simulation.model_system.append(model_system)
-
-        # if simulation.model_system[-1].is_representative and topology:
-        #     self.parse_system_hierarchy(model_system, topology, path_topology, branch_depth=0)
-
-        ## Populate now using system_info2 ##
         atomic_cell = AtomicCell()
         atomic_cell_dict = data.pop("atomic_cell")
         atom_labels = atomic_cell_dict.pop("labels")
@@ -1076,9 +1026,6 @@ class H5MDParser(MDParser):
         model_system.cell.append(atomic_cell)
         self.parse_section(data, model_system)
         simulation.model_system.append(model_system)
-
-        if simulation.model_system[-1].is_representative and topology:
-            self.parse_system_hierarchy(model_system, topology, path_topology)
 
         return model_system
 
@@ -1113,24 +1060,15 @@ class H5MDParser(MDParser):
             # REMAP some of the data for the schema
             atoms_dict["branch_label"] = "Total System"  #? Do we or should we have a default name for the entire system?
             atoms_dict["time_step"] = atoms_dict.pop("time").magnitude  #TODO change in system_info
-            # atoms_dict["dimensionality"] = atoms_dict.pop("dimension")  #TODO change in system_info
             atomic_cell_keys = ["n_atoms", "lattice_vectors", "periodic_boundary_conditions", "positions", "velocities", "labels"]
             atoms_dict["atomic_cell"] = {}
             for key in atomic_cell_keys:
                 atoms_dict["atomic_cell"][key] = atoms_dict.pop(key)
-            # atoms_dict["atomic_cell"]["n_atoms"] = atoms_dict.pop("n_atoms")
-            # atoms_dict["atomic_cell"]["lattice_vectors"] = atoms_dict.pop("lattice_vectors")
-            # atoms_dict["atomic_cell"]["periodic_boundary_conditions"] = atoms_dict.pop("periodic")
-            # atoms_dict["atomic_cell"]["positions"] = atoms_dict.pop("positions")
-            # atoms_dict["atomic_cell"]["velocities"] = atoms_dict.pop("velocities")
-            # atoms_dict["atomic_cell"]["atoms_state"] = []
-            # for label in atoms_dict.pop("labels"):
-            #     atoms_dict["atomic_cell"]["atoms_state"].append({"chemical_symbol": label})
 
-            self.parse_trajectory_step2(atoms_dict, simulation, topology, path_topology)  # TODO reassess passing of top and path_top here
+            self.parse_trajectory_step2(atoms_dict, simulation)
 
-            # if i_step == 0 and topology:  # TODO extend to time-dependent topologies
-            #     self.parse_atomsgroup(sec_run.system[i_step], topology, path_topology)
+            if i_step == 0 and topology:  # TODO extend to time-dependent topologies
+                self.parse_system_hierarchy(simulation.model_system[-1], topology, path_topology)
 
 
     def write_to_archive(self) -> None:
@@ -1154,7 +1092,7 @@ class H5MDParser(MDParser):
         self.parse_atom_parameters()
         self.parse_system_info()
         self.parse_system_info2()
-        # self.parse_observable_info()
+        self.parse_observable_info()
         # self.parse_parameter_info()
 
         ###########################
@@ -1175,7 +1113,7 @@ class H5MDParser(MDParser):
 
         self.parse_system()
 
-        # self.parse_calculation()
+        self.parse_calculation()
 
         # self.parse_workflow()
 
@@ -1197,10 +1135,11 @@ class H5MDParser(MDParser):
         )
 
         self.parse_system2(simulation)
-        # # simulation.model_system.append(model_system)
         # # self.parse_method(simulation)
-        # # self.parse_winput(simulation)
+
         # # self.parse_output(simulation)
+
+        # self.parse_workflow(simulation)
 
 
         self.archive.m_add_sub_section(EntryArchive.data, simulation)
