@@ -33,6 +33,7 @@ from nomad_simulations import Program as BaseProgram
 
 # New schema
 from nomad_simulations import Simulation
+from nomad_simulations.outputs import Outputs
 from nomad_simulations.atoms_state import (
     AtomsState,
     CoreHole,
@@ -1094,6 +1095,105 @@ class H5MDParser(MDParser):
                     simulation.model_system[-1], topology, path_topology
                 )
 
+    # TODO move this function to the MDParser class and rename!
+    def parse_thermodynamics_step2(self, data: Dict[str, Any], simulation: Simulation) -> None:
+        if self.archive is None:
+            return
+
+        if (
+            step := data.get("step")
+        ) is not None and step not in self.thermodynamics_steps:
+            return
+
+        output = Outputs() # Outputs(model_system_ref=simulation.model_system[-1])
+        simulation.outputs.append(output)
+
+        self.parse_section(data, output)
+        try:
+            system_ref_index = self.trajectory_steps.index(output.step)
+            output.model_system_ref = simulation.model_system[system_ref_index]
+        except Exception:
+            pass
+
+    def parse_outputs(self, simulation: Simulation):
+        calculation_info = self._observable_info.get('configurational')
+        if (
+            not calculation_info
+        ):  # TODO should still create entries for system time link in this case
+            return
+
+        system_info = self._system_info.get(
+            'calculation'
+        )  # note: it is currently ensured in parse_system() that these have the same length as the system_map
+        for step in self.steps:
+            data = {
+                'method_ref': simulation.method[-1] if simulation.method else None,
+                'step': step,
+                'energy': {},
+            }
+            data_h5md = {
+                'x_h5md_custom_calculations': [],
+                'x_h5md_energy_contributions': [],
+            }
+            data['time'] = calculation_info.get('step', {}).get('time')
+            if not data['time']:
+                data['time'] = system_info.get('step', {}).get('time')
+
+            for key, val in system_info.get(step, {}).items():
+                if key == 'forces':
+                    data[key] = dict(total=dict(value=val))
+                elif hasattr(BaseCalculation, key):
+                    data[key] = val
+                else:
+                    unit = None
+                    if hasattr(val, 'units'):
+                        unit = val.units
+                        val = val.magnitude
+                    data_h5md['x_h5md_custom_calculations'].append(
+                        CalcEntry(kind=key, value=val, unit=unit)
+                    )
+
+            for key, val in calculation_info.get(step).items():
+                key_split = key.split('-')
+                observable_name = key_split[0]
+                observable_label = key_split[1] if len(key_split) > 1 else key_split[0]
+                if (
+                    'energ' in observable_name
+                ):  # TODO check for energies or energy when matching name
+                    if hasattr(Energy, observable_label):
+                        data['energy'][observable_label] = dict(value=val)
+                    else:
+                        data_h5md['x_h5md_energy_contributions'].append(
+                            EnergyEntry(kind=key, value=val)
+                        )
+                elif hasattr(BaseCalculation, observable_label):
+                    data[observable_label] = val
+                else:
+                    unit = None
+                    if hasattr(val, 'units'):
+                        unit = val.units
+                        val = val.magnitude
+                    data_h5md['x_h5md_custom_calculations'].append(
+                        CalcEntry(kind=key, value=val, unit=unit)
+                    )
+
+            self.parse_thermodynamics_step2(data)
+            output = simulation.outputs[-1]
+
+            if output.step != step:  # TODO check this comparison
+                output = Output()
+                simulation.ouputs.append(output)
+                output.step = int(step)
+                output.time = data['time']
+            for calc_entry in data_h5md['x_h5md_custom_calculations']:
+                output.x_h5md_custom_calculations.append(calc_entry)
+            sec_energy = output.energy
+            if not sec_energy:
+                sec_energy = Energy()
+                output.append(sec_energy)
+            for energy_entry in data_h5md['x_h5md_energy_contributions']:
+                sec_energy.x_h5md_energy_contributions.append(energy_entry)
+
     def write_to_archive(self) -> None:
         self._maindir = os.path.dirname(self.mainfile)
         self._h5md_files = os.listdir(self._maindir)
@@ -1164,9 +1264,10 @@ class H5MDParser(MDParser):
         )
 
         self.parse_system2(simulation)
+
         # # self.parse_method(simulation)
 
-        # # self.parse_output(simulation)
+        self.parse_outputs(simulation)
 
         # self.parse_workflow(simulation)
 
