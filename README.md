@@ -1,105 +1,109 @@
-# NOMAD's parser example plugin
+# NOMAD's H5MD-NOMAD Parser Plugin
+This is a plugin for [NOMAD](https://nomad-lab.eu) which contains a parser for the H5MD-NOMAD HDF5 file format.
 
 ## Getting started
 
-### Fork the project
-
-Go to the github project page https://github.com/nomad-coe/nomad-parser-plugin-example, hit
-fork (and leave a star, thanks!). Maybe you want to rename the project while forking!
-
-### Clone your fork
-
-Follow the github instructions. The URL and directory depends on your user name or organization and the
-project name you choose. But, it should look somewhat like this:
-
-```
-git clone git@github.com:markus1978/my-nomad-schema.git
-cd my-nomad-schema
-```
-
 ### Install the dependencies
 
-You should create a virtual environment. You will need the `nomad-lab` package (and `pytest`).
-You need at least Python 3.9.
+Clone the project and in the workspace folder, create a virtual environment (note this project uses Python 3.9):
 
 ```sh
-python3 -m venv .pyenv
-source .pyenv/bin/activate
-pip install --upgrade pip
-pip install '.[dev]' --index-url https://gitlab.mpcdf.mpg.de/api/v4/projects/2187/packages/pypi/simple
+git clone https://github.com/nomad-coe/nomad-parser-h5md.git
+cd nomad-parser-h5md
+python3.9 -m venv .pyenv
+. .pyenv/bin/activate
 ```
 
-**Note!**
-Until we have an official pypi NOMAD release with the plugins functionality. Make
-sure to include NOMAD's internal package registry (e.g. via `--index-url`). Follow the instructions
-in `requirements.txt`.
+There are 2 options for installation, while linking to the nomad-lab package:
+
+1. Install with the current settings, which link to the develop branch of nomad-lab. In this case,
+leave the `pyproject.toml` settings as is.
+
+2. Install by linking to your local development version of nomad-lab. In this case, go into `pyproject.toml`
+and replace:
+
+```
+"nomad-lab@git+https://github.com/nomad-coe/nomad.git@develop",
+```
+
+under the dependencies variable to:
+```
+"nomad-lab@file://<full_path_to_NOMAD>",
+```
+
+Now, install the plugin in development mode:
+
+```sh
+pip install --upgrade pip
+pip install -e '.[dev]'
+```
+
+
 
 ### Run the tests
 
-Make sure the current directory is in your path:
+You can run local tests using the `pytest` package:
 
 ```sh
-export PYTHONPATH=.
+python -m pytest -sv
 ```
 
-You can run automated tests with `pytest`:
+where the `-s` and `-v` options toggle the output verbosity.
+
+Our CI/CD pipeline produces a more comprehensive test report using `coverage` and `coveralls` packages.
+To emulate this locally, perform:
 
 ```sh
-pytest -svx tests
+pip install coverage coveralls
+python -m coverage run -m pytest -sv
 ```
 
-### Run linting
+This setup should allow you to run and test the plugin as a "standalone" package, i.e., without explicitly adding it to the NOMAD package.
+However, if there is some issue in NOMAD recognizing the package, you may also need to add the package folder to the `PYTHONPATH` of the Python environment of your local NOMAD installation:
+
+```sh
+export PYTHONPATH="$PYTHONPATH:<path-to-plugin-cloned-repo>/src"
+```
+
+
+### Run linting and auto-formatting
 
 ```sh
 ruff check .
+ruff format . --check
 ```
 
-### Run auto-formatting
+Ruff auto-formatting is also a part of the GitHub workflow actions. Make sure that before you make a Pull Request, `ruff format . --check` runs in your local without any errors otherwise the workflow action will fail.
 
-This is entirely optional. To add this as a check in github actions pipeline, uncomment the `ruff-formatting` step in `./github/workflows/actions.yaml`.
+### Debugging
 
-```sh
-ruff format .
+For interactive debugging of the tests, use `pytest` with the `--pdb` flag.
+We recommend using an IDE for debugging, e.g., _VSCode_.
+If using VSCode, you can add the following snippet to your `.vscode/launch.json`:
+
+```json
+{
+  "configurations": [
+      {
+        "name": "<descriptive tag>",
+        "type": "debugpy",
+        "request": "launch",
+        "cwd": "${workspaceFolder}",
+        "program": "${workspaceFolder}/.pyenv/bin/pytest",
+        "justMyCode": true,
+        "env": {
+            "_PYTEST_RAISE": "1"
+        },
+        "args": [
+            "-sv",
+            "--pdb",
+            "<path to plugin tests>",
+        ]
+    }
+  ]
+}
 ```
 
-You can parse an example archive that uses the schema with `nomad`
-(installed via `nomad-lab` Python package):
+where `${workspaceFolder}` refers to the NOMAD root.
 
-```sh
-nomad parse tests/data/test.example-format.txt --show-archive
-```
-
-## Developing your schema
-
-You can now start to develop you schema. Here are a few things that you might want to change:
-
-- The metadata in `nomad_plugin.yaml`.
-- The name of the Python package `nomadparserexample`. If you want to define multiple plugins, you can nest packages.
-- The name of the example parser `ExampleParser` and the schema definitions it might define.
-- When you change module and class names, make sure to update the `nomad_plugin.yaml` accordingly.
-
-
-## Build the python package
-
-The `pyproject.toml` file contains everything that is necessary to turn the project
-into a pip installable python package. Run the python build tool to create a package distribution:
-
-```
-pip install build
-python -m build --sdist
-```
-
-You can install the package with pip:
-
-```
-pip install dist/nomad-schema-plugin-example-1.0.tar.gz
-```
-
-Read more about python packages, `pyproject.toml`, and how to upload packages to PyPI
-on the [PyPI documentation](https://packaging.python.org/en/latest/tutorials/packaging-projects/).
-
-
-## Next steps
-
-To learn more about plugins, how to add them to an Oasis, how to publish them, read our
-documentation on plugins: https://nomad-lab.eu/docs/plugins/plugins.html.
+The settings configuration file `.vscode/settings.json` performs automatically applies the linting upon saving the file progress.
