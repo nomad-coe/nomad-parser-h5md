@@ -18,7 +18,6 @@
 #
 
 import nomad_simulations
-import nomad_simulations.model_system
 import numpy as np
 from nomad.datamodel.data import ArchiveSection
 from nomad.metainfo import Context, MEnum, Quantity, Section, SectionProxy, SubSection
@@ -64,38 +63,38 @@ class ParamEntry(ArchiveSection):
     )
 
 
-# class CalcEntry(ArchiveSection):
-#     """
-#     Section describing a general type of calculation.
-#     """
+class OutputsEntry(ArchiveSection):
+    """
+    Section describing a general type of calculation.
+    """
 
-#     m_def = Section(validate=False)
+    m_def = Section(validate=False)
 
-#     kind = Quantity(
-#         type=str,
-#         shape=[],
-#         description="""
-#         Kind of the quantity.
-#         """,
-#     )
+    kind = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Kind of the quantity.
+        """,
+    )
 
-#     value = Quantity(
-#         type=np.dtype(np.float64),
-#         shape=[],
-#         description="""
-#         Value of this contribution.
-#         """,
-#     )
+    value = Quantity(
+        type=np.dtype(np.float64),
+        shape=[],
+        description="""
+        Value of this contribution.
+        """,
+    )
 
-#     unit = Quantity(
-#         type=str,
-#         shape=[],
-#         description="""
-#         Unit of the parameter as a string.
-#         """,
-#     )
+    unit = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Unit of the parameter as a string.
+        """,
+    )
 
-#     # TODO add description quantity
+    # TODO add description quantity
 
 
 # class ForceCalculations(runschema.method.ForceCalculations):
@@ -143,35 +142,45 @@ class ModelSystem(nomad_simulations.model_system.ModelSystem):
         )
     )
 
+class ClassicalEnergyContributions(nomad_simulations.properties.ClassicalEnergyContributions):
+    m_def = Section(
+        validate=False,
+        extends_base_section=True,
+    )
 
-# class Calculation(runschema.calculation.Calculation):
-#     m_def = Section(
-#         validate=False,
-#         extends_base_section=True,
-#     )
+    x_h5md_energy_contributions = SubSection(
+        sub_section=OutputsEntry.m_def,
+        description="""
+        Contains other custom energy contributions that are not already defined.
+        """,
+        repeats=True,
+    )
 
-#     x_h5md_custom_calculations = SubSection(
-#         sub_section=ParamEntry.m_def,
-#         description="""
-#         Contains other generic custom calculations that are not already defined.
-#         """,
-#         repeats=True,
-#     )
+class TotalEnergy(nomad_simulations.properties.TotalEnergy):
+    classical_contributions = SubSection(
+        sub_section=ClassicalEnergyContributions.m_def,
+        description="""
+        Contains the classical energy contributions.
+        """,
+    )
+
+class TrajectoryOutputs(nomad_simulations.outputs.TrajectoryOutputs):
+    m_def = Section(
+        validate=False,
+        extends_base_section=True,
+    )
+
+    x_h5md_custom_outputs = SubSection(
+        sub_section=OutputsEntry.m_def,
+        description="""
+        Contains other generic custom outputs that are not already defined.
+        """,
+        repeats=True,
+    )
+
+    total_energy = SubSection(sub_section=TotalEnergy.m_def, repeats=True)
 
 
-# class Energy(runschema.calculation.Energy):
-#     m_def = Section(
-#         validate=False,
-#         extends_base_section=True,
-#     )
-
-#     x_h5md_energy_contributions = SubSection(
-#         sub_section=runschema.calculation.EnergyEntry.m_def,
-#         description="""
-#         Contains other custom energy contributions that are not already defined.
-#         """,
-#         repeats=True,
-#     )
 
 
 class Author(ArchiveSection):
