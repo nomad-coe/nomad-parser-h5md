@@ -30,7 +30,7 @@ class ParamEntry(ArchiveSection):
 
     m_def = Section(validate=False)
 
-    kind = Quantity(
+    name = Quantity(
         type=str,
         shape=[],
         description="""
@@ -70,11 +70,11 @@ class OutputsEntry(ArchiveSection):
 
     m_def = Section(validate=False)
 
-    kind = Quantity(
+    name = Quantity(
         type=str,
         shape=[],
         description="""
-        Kind of the quantity.
+        Name of the quantity.
         """,
     )
 
@@ -148,7 +148,7 @@ class ClassicalEnergyContributions(nomad_simulations.properties.ClassicalEnergyC
         extends_base_section=True,
     )
 
-    x_h5md_energy_contributions = SubSection(
+    x_h5md_contributions = SubSection(
         sub_section=OutputsEntry.m_def,
         description="""
         Contains other custom energy contributions that are not already defined.
@@ -157,6 +157,28 @@ class ClassicalEnergyContributions(nomad_simulations.properties.ClassicalEnergyC
     )
 
 class TotalEnergy(nomad_simulations.properties.TotalEnergy):
+    classical_contributions = SubSection(
+        sub_section=ClassicalEnergyContributions.m_def,
+        description="""
+        Contains the classical energy contributions.
+        """,
+    )
+
+class ForceContributions(nomad_simulations.properties.ForceContributions):
+    m_def = Section(
+        validate=False,
+        extends_base_section=True,
+    )
+
+    x_h5md_contributions = SubSection(
+        sub_section=OutputsEntry.m_def,
+        description="""
+        Contains other custom force contributions that are not already defined.
+        """,
+        repeats=True,
+    )
+
+class TotalForce(nomad_simulations.properties.TotalForce):
     classical_contributions = SubSection(
         sub_section=ClassicalEnergyContributions.m_def,
         description="""
