@@ -668,11 +668,20 @@ class H5MDParser(MDParser):
                 if (
                     'energ' in observable_name
                 ):  # TODO check for energies or energy when matching name
-                    if hasattr(Energy, observable_label):
-                        data['energy'][observable_label] = dict(value=val)
+                    # check for usage of energy/mole and convert to energy
+                    if val.check("[energy]/[substance]") and "mole" in str(val.units):
+                        val = val * MOL * ureg.mole
+
+                    if val.check("[energy]"):
+                        if hasattr(Energy, observable_label):
+                            data["energy"][observable_label] = dict(value=val)
+                        else:
+                            data_h5md["x_h5md_energy_contributions"].append(
+                                EnergyEntry(kind=key, value=val)
+                            )
                     else:
-                        data_h5md['x_h5md_energy_contributions'].append(
-                            EnergyEntry(kind=key, value=val)
+                        self.logger.warning(
+                            "Energy value not in energy units. Skipping entry."
                         )
                 elif hasattr(BaseCalculation, observable_label):
                     data[observable_label] = val
@@ -1102,37 +1111,37 @@ class H5MDParser(MDParser):
                     simulation.model_system[-1], topology, path_topology
                 )
 
-    def parse_section_test(self, data: Dict[str, Any], root: MSection) -> None:
-        """
-        Write the quantities in data into an archive section.
-        """
-        from nomad.metainfo import SubSection
-        print(data.items())
-        for key, val in data.items():
-            if not hasattr(root, key):
-                continue
+    # def parse_section_test(self, data: Dict[str, Any], root: MSection) -> None:
+    #     """
+    #     Write the quantities in data into an archive section.
+    #     """
+    #     from nomad.metainfo import SubSection
+    #     print(data.items())
+    #     for key, val in data.items():
+    #         if not hasattr(root, key):
+    #             continue
 
-            print(key, val)
-            print(root)
-            print(root.m_def)
-            section = getattr(root.m_def.section_cls, key)
-            print(section)
-            print(section.m_def)
-            if isinstance(section, SubSection):
-                print(val)
-                print(isinstance(val, dict))
-                print([val])
-                print([val_n for val_n in [val]])
-                for val_n in [val] if isinstance(val, dict) else val:
-                    print(val_n)
-                    print(section.sub_section.section_cls())
-                    sub_section = section.sub_section.section_cls()
-                    root.m_add_sub_section(section, sub_section)
-                    print(root)
-                    self.parse_section_test(val_n, sub_section)
-                continue
+    #         print(key, val)
+    #         print(root)
+    #         print(root.m_def)
+    #         section = getattr(root.m_def.section_cls, key)
+    #         print(section)
+    #         print(section.m_def)
+    #         if isinstance(section, SubSection):
+    #             print(val)
+    #             print(isinstance(val, dict))
+    #             print([val])
+    #             print([val_n for val_n in [val]])
+    #             for val_n in [val] if isinstance(val, dict) else val:
+    #                 print(val_n)
+    #                 print(section.sub_section.section_cls())
+    #                 sub_section = section.sub_section.section_cls()
+    #                 root.m_add_sub_section(section, sub_section)
+    #                 print(root)
+    #                 self.parse_section_test(val_n, sub_section)
+    #             continue
 
-            root.m_set(root.m_get_quantity_definition(key), val)
+    #         root.m_set(root.m_get_quantity_definition(key), val)
 
     # TODO move this function to the MDParser class and rename!
     def parse_output_step(self, data: Dict[str, Any], simulation: Simulation) -> bool:
@@ -1192,6 +1201,7 @@ class H5MDParser(MDParser):
             if not data['time']:
                 data['time'] = system_info.get(step, {}).get('time')
 
+            # TODO decide if forces will stay in system_info and will be placed still in outputs
             forces = system_info.get(step, {}).get('forces')
             if forces is not None:
                 data['total_force']['value'] = forces
@@ -1210,7 +1220,6 @@ class H5MDParser(MDParser):
             #         )
 
             for key, val in outputs_info.get(step).items():
-                print(key, val)
                 key_split = key.split('-')
                 observable_name = key_split[0]
                 observable_label = key_split[1] if len(key_split) > 1 else key_split[0]
@@ -1219,6 +1228,7 @@ class H5MDParser(MDParser):
                 elif (
                     'energ' in observable_name
                 ):  # TODO check for energies or energy when matching name
+                    # TODO add support for energy/mole as in parse_calculation
                     if hasattr(ClassicalEnergyContributions, observable_label):
                         data['total_energy']['classical_contributions'][observable_label] = {'value': val}
                     else:
