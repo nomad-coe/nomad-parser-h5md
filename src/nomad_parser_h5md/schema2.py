@@ -142,11 +142,7 @@ class ModelSystem(nomad_simulations.model_system.ModelSystem):
         )
     )
 
-class ClassicalEnergyContributions(nomad_simulations.properties.ClassicalEnergyContributions):
-    m_def = Section(
-        validate=False,
-        extends_base_section=True,
-    )
+class TotalEnergy(nomad_simulations.properties.TotalEnergy):
 
     x_h5md_contributions = SubSection(
         sub_section=OutputsEntry.m_def,
@@ -156,19 +152,7 @@ class ClassicalEnergyContributions(nomad_simulations.properties.ClassicalEnergyC
         repeats=True,
     )
 
-class TotalEnergy(nomad_simulations.properties.TotalEnergy):
-    classical_contributions = SubSection(
-        sub_section=ClassicalEnergyContributions.m_def,
-        description="""
-        Contains the classical energy contributions.
-        """,
-    )
-
-class ForceContributions(nomad_simulations.properties.ForceContributions):
-    m_def = Section(
-        validate=False,
-        extends_base_section=True,
-    )
+class TotalForce(nomad_simulations.properties.TotalForce):
 
     x_h5md_contributions = SubSection(
         sub_section=OutputsEntry.m_def,
@@ -178,13 +162,6 @@ class ForceContributions(nomad_simulations.properties.ForceContributions):
         repeats=True,
     )
 
-class TotalForce(nomad_simulations.properties.TotalForce):
-    classical_contributions = SubSection(
-        sub_section=ClassicalEnergyContributions.m_def,
-        description="""
-        Contains the classical energy contributions.
-        """,
-    )
 
 class TrajectoryOutputs(nomad_simulations.outputs.TrajectoryOutputs):
     m_def = Section(
@@ -201,8 +178,6 @@ class TrajectoryOutputs(nomad_simulations.outputs.TrajectoryOutputs):
     )
 
     total_energy = SubSection(sub_section=TotalEnergy.m_def, repeats=True)
-
-
 
 
 class Author(ArchiveSection):
