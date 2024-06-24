@@ -38,6 +38,8 @@ def test_md(parser):
     #######################
     # Test the OLD SCHEMA #
     #######################
+
+    ## H5MD
     sec_run = archive.run[0]
     assert sec_run.program.name == 'OpenMM'
     assert sec_run.program.version == '-1.-1.-1'
@@ -48,6 +50,7 @@ def test_md(parser):
     assert sec_run.x_h5md_creator.name == 'h5py'
     assert sec_run.x_h5md_creator.version == '3.6.0'
 
+    ## METHOD
     # sec_method = sec_run.method
     # sec_atom_params = sec_method[0].atom_parameters
     # assert len(sec_atom_params) == 31583
@@ -68,6 +71,7 @@ def test_md(parser):
     # assert sec_method[0].force_field.force_calculations.neighbor_searching.neighbor_update_frequency == 1
     # assert sec_method[0].force_field.force_calculations.neighbor_searching.neighbor_update_cutoff.to('nm').magnitude == approx(1.2)
 
+    ## SYSTEM
     sec_systems = sec_run.system
     assert len(sec_systems) == 5
     assert np.shape(sec_systems[0].atoms.positions) == (31583, 3)
@@ -128,6 +132,7 @@ def test_md(parser):
     assert sec_res[0].x_h5md_parameters[0].value == '0.13'
     assert sec_res[0].x_h5md_parameters[0].unit is None
 
+    ## CALCULATION
     sec_calc = sec_run.calculation
     assert len(sec_calc) == 5
     assert np.shape(sec_calc[1].forces.total.value) == (31583, 3)
@@ -147,6 +152,7 @@ def test_md(parser):
         3000.0
     )
 
+    ## WORKFLOW
     # sec_workflow = archive.workflow2
     # assert sec_workflow.m_def.name == 'MolecularDynamics'
     # sec_method = sec_workflow.method
@@ -199,6 +205,8 @@ def test_md(parser):
     #######################
     # Test the NEW SCHEMA #
     #######################
+
+    ## H5MD
     # TODO convert towards unit testing
     sec_simulation = archive.data
     assert sec_simulation.program.name == 'OpenMM'
@@ -210,6 +218,7 @@ def test_md(parser):
     assert sec_simulation.x_h5md_creator.name == 'h5py'
     assert sec_simulation.x_h5md_creator.version == '3.6.0'
 
+    ## SYSTEM
     sec_systems = sec_simulation.model_system
     assert len(sec_systems) == 5
     assert np.shape(sec_systems[0].cell[0].positions) == (31583, 3)
@@ -245,6 +254,31 @@ def test_md(parser):
     assert len(sec_res) == 3
     assert sec_res[0].branch_label == 'SER'
     assert sec_res[0].atom_indices[10] == 144
-    assert sec_res[0].custom_system_attributes[0].kind == 'hydrophobicity'
+    assert sec_res[0].custom_system_attributes[0].name == 'hydrophobicity'
     assert sec_res[0].custom_system_attributes[0].value == '0.13'
     assert sec_res[0].custom_system_attributes[0].unit is None
+
+    ## OUTPUTS
+    ## CALCULATION
+    sec_outputs = sec_simulation.outputs
+    assert len(sec_outputs) == 5
+    assert np.shape(sec_outputs[1].total_force[0].value) == (31583, 3)
+    assert sec_outputs[1].total_force[0].value[2100][2].to('newton').magnitude == approx(
+        500.0
+    )
+    assert sec_outputs[2].temperature[0].value.to('kelvin').magnitude == approx(300.0)
+    assert len(sec_outputs[1].x_h5md_custom_outputs) == 1
+    assert sec_outputs[1].x_h5md_custom_outputs[0].name == 'custom_thermo'
+    assert sec_outputs[1].x_h5md_custom_outputs[0].value == approx(100.0)
+    assert sec_outputs[1].x_h5md_custom_outputs[0].unit == 'newton / angstrom ** 2'
+    assert sec_outputs[2].time.to('ps').magnitude == approx(2.0)
+    # TODO add total energy value
+    assert sec_outputs[2].total_energy[0].contributions[0].m_def.name == 'KineticEnergy'
+    assert sec_outputs[2].total_energy[0].contributions[0].value.to('kilojoule').magnitude == approx(2.0)
+    assert sec_outputs[2].total_energy[0].contributions[1].m_def.name == 'PotentialEnergy'
+    assert sec_outputs[2].total_energy[0].contributions[1].value.to('kilojoule').magnitude == approx(1.0)
+    assert sec_outputs[1].total_energy[0].x_h5md_contributions[0].name == 'energy-custom'
+    assert sec_outputs[1].total_energy[0].x_h5md_contributions[0].value.magnitude == approx(
+        3000.0
+    )
+    # TODO add custom force contributions

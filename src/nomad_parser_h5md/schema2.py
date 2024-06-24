@@ -28,8 +28,6 @@ class ParamEntry(ArchiveSection):
     Generic section defining a parameter name and value
     """
 
-    m_def = Section(validate=False)
-
     name = Quantity(
         type=str,
         shape=[],
@@ -68,8 +66,6 @@ class OutputsEntry(ArchiveSection):
     Section describing a general type of calculation.
     """
 
-    m_def = Section(validate=False)
-
     name = Quantity(
         type=str,
         shape=[],
@@ -94,8 +90,57 @@ class OutputsEntry(ArchiveSection):
         """,
     )
 
-    # TODO add description quantity
+    description = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Further description of the output.
+        """,
+    )
 
+class EnergyEntry(ArchiveSection):
+    """
+    Section describing a general type of energy contribution.
+    """
+
+    name = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Name of the energy contribution.
+        """,
+    )
+
+    value = Quantity(
+        type=np.dtype(np.float64),
+        shape=[],
+        unit='joule',
+        description="""
+        Value of the energy contribution.
+        """,
+    )
+
+class ForceEntry(ArchiveSection):
+    """
+    Section describing a general type of force contribution.
+    """
+
+    name = Quantity(
+        type=str,
+        shape=[],
+        description="""
+        Name of the force contribution.
+        """,
+    )
+
+    value = Quantity(
+        type=np.dtype(np.float64),
+        shape=[],
+        unit='newton',
+        description="""
+        Value of the force contribution.
+        """,
+    )
 
 # class ForceCalculations(runschema.method.ForceCalculations):
 #     m_def = Section(
@@ -145,7 +190,7 @@ class ModelSystem(nomad_simulations.model_system.ModelSystem):
 class TotalEnergy(nomad_simulations.properties.TotalEnergy):
 
     x_h5md_contributions = SubSection(
-        sub_section=OutputsEntry.m_def,
+        sub_section=EnergyEntry.m_def,
         description="""
         Contains other custom energy contributions that are not already defined.
         """,
@@ -155,7 +200,7 @@ class TotalEnergy(nomad_simulations.properties.TotalEnergy):
 class TotalForce(nomad_simulations.properties.TotalForce):
 
     x_h5md_contributions = SubSection(
-        sub_section=OutputsEntry.m_def,
+        sub_section=ForceEntry.m_def,
         description="""
         Contains other custom force contributions that are not already defined.
         """,
@@ -179,6 +224,7 @@ class TrajectoryOutputs(nomad_simulations.outputs.TrajectoryOutputs):
 
     total_energy = SubSection(sub_section=TotalEnergy.m_def, repeats=True)
 
+    total_force = SubSection(sub_section=TotalForce.m_def, repeats=True)
 
 class Author(ArchiveSection):
     """

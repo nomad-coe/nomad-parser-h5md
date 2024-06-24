@@ -73,7 +73,10 @@ from .schema2 import (
     TrajectoryOutputs,
     OutputsEntry,
     TotalEnergy,
-    TotalForce
+    TotalForce,
+    ParamEntry as ParamEntry2,
+    ForceEntry,
+    EnergyEntry as EnergyEntry2,
 )
 
 class HDF5Parser(FileParser):
@@ -1029,7 +1032,7 @@ class H5MDParser(MDParser):
                 units = val.units if hasattr(val, 'units') else None
                 val = val.magnitude if units is not None else val
                 sec_model_system.custom_system_attributes.append(
-                    ParamEntry(kind=particles_group_key, value=val, unit=units)
+                    ParamEntry2(name=particles_group_key, value=val, unit=units)
                 )
 
             # get the next branch level
@@ -1119,38 +1122,6 @@ class H5MDParser(MDParser):
                     simulation.model_system[-1], topology, path_topology
                 )
 
-    # def parse_section_test(self, data: Dict[str, Any], root: MSection) -> None:
-    #     """
-    #     Write the quantities in data into an archive section.
-    #     """
-    #     from nomad.metainfo import SubSection
-    #     print(data.items())
-    #     for key, val in data.items():
-    #         if not hasattr(root, key):
-    #             continue
-
-    #         print(key, val)
-    #         print(root)
-    #         print(root.m_def)
-    #         section = getattr(root.m_def.section_cls, key)
-    #         print(section)
-    #         print(section.m_def)
-    #         if isinstance(section, SubSection):
-    #             print(val)
-    #             print(isinstance(val, dict))
-    #             print([val])
-    #             print([val_n for val_n in [val]])
-    #             for val_n in [val] if isinstance(val, dict) else val:
-    #                 print(val_n)
-    #                 print(section.sub_section.section_cls())
-    #                 sub_section = section.sub_section.section_cls()
-    #                 root.m_add_sub_section(section, sub_section)
-    #                 print(root)
-    #                 self.parse_section_test(val_n, sub_section)
-    #             continue
-
-    #         root.m_set(root.m_get_quantity_definition(key), val)
-
     # TODO move this function to the MDParser class and rename!
     def parse_output_step(self, data: Dict[str, Any], simulation: Simulation) -> bool:
         if self.archive is None:
@@ -1164,17 +1135,8 @@ class H5MDParser(MDParser):
         output = TrajectoryOutputs() # Outputs(model_system_ref=simulation.model_system[-1])
         simulation.outputs.append(output)
 
-        # output.step = data['step']
-        # output.time = data['time']
-        # from nomad_simulations.properties import TotalEnergy
-        # total_energy = TotalEnergy(value = data['total_energy']['value'])
-        # output.total_energy.append(total_energy)
-        # classical_contibutions = ClassicalEnergyContributions()
-        # total_energy.classical_contributions = classical_contibutions
-        # classical_contibutions.kinetic = data['total_energy']['classical_contributions']['kinetic']
-        # classical_contibutions.potential = data['total_energy']['classical_contributions']['potential']
-
-        energy_contributions = data.pop('total_energy', {}).pop('contributions', {})
+        energy_contributions = data.get('total_energy', {}).pop('contributions', {})
+        force_contributions = data.get('total_force', {}).pop('contributions', {})
         self.parse_section(data, output)
         try:
             system_ref_index = self.trajectory_steps.index(output.step)
@@ -1190,6 +1152,15 @@ class H5MDParser(MDParser):
             energy = self.energy_classes[energy_label]()
             output.total_energy[-1].contributions.append(energy)
             self.parse_section(energy_dict, energy)
+
+        if force_contributions:
+            if len(output.total_force) == 0:
+                output.total_force.append(TotalForce())
+
+        for force_label, force_dict in force_contributions.items():
+            force = self.force_classes[force_label]()
+            output.total_force[-1].contributions.append(force)
+            self.parse_section(force_dict, force)
 
         return True
 
@@ -1221,57 +1192,42 @@ class H5MDParser(MDParser):
                 'x_h5md_energy_contributions': [],
                 'x_h5md_force_contributions': [],
             }
-            data_outputs['time'] = outputs_info.get(step, {}).get('time')
+            data_outputs['time'] = outputs_info.get(step, {}).pop('time')
             if not data_outputs['time']:
-                data_outputs['time'] = system_info.get(step, {}).get('time')
+                data_outputs['time'] = system_info.get(step, {}).pop('time')
 
             # TODO decide if forces will stay in system_info and will be placed still in outputs
             forces = system_info.get(step, {}).get('forces')
             if forces is not None:
                 data_outputs['total_force']['value'] = forces
-            # for key, val in system_info.get(step, {}).items():
-            #     if key == 'forces':
-            #         data['total_force']['value'] = val
-            #     elif hasattr(TrajectoryOutputs, key):
-            #         data[key]['value'] = val
-            #     else:
-            #         unit = None
-            #         if hasattr(val, 'units'):
-            #             unit = val.units
-            #             val = val.magnitude
-            #         data_h5md['x_h5md_custom_calculations'].append(
-            #             OutputsEntry(kind=key, value=val, unit=unit)
-            #         )
 
             for key, val in outputs_info.get(step).items():
                 key_split = key.split('-')
                 observable_name = key_split[0]
                 observable_label = key_split[1] if len(key_split) > 1 else key_split[0]
-                if observable_name == 'total_energy':
+                if observable_label == 'total':
                     data_outputs['total_energy']['value'] = val
                 elif (
-                    'energ' in observable_name
+                    'energ' in key
                 ):  # TODO check for energies or energy when matching name
                     # TODO add support for energy/mole as in parse_calculation
                     if observable_label in self.energy_classes.keys():
                         data_outputs['total_energy']['contributions'][observable_label] = {'value': val}
                     else:
                         data_h5md['x_h5md_energy_contributions'].append(
-                            OutputsEntry(name=key, value=val.magnitude, unit=val.units)
+                            EnergyEntry2(name=key, value=val)
                         )
-                # elif observable_name == 'forces':
-                #     data['total_force']['value'] = val
                 elif (
-                    'force' in observable_name
+                    'force' in key
                 ):
                     if observable_label in self.force_classes.keys():
                         data_outputs['total_force']['contributions'][observable_label] = {'value': val}
                     else:
                         data_h5md['x_h5md_force_contributions'].append(
-                            OutputsEntry(name=key, value=val.magnitude, unit=val.units)
+                            ForceEntry(name=key, value=val)
                         )
                 elif hasattr(TrajectoryOutputs, observable_label):
-                    data_outputs[observable_label] = val
+                    data_outputs[observable_label] = {'value': val}
                 else:
                     unit = None
                     if hasattr(val, 'units'):
@@ -1297,111 +1253,8 @@ class H5MDParser(MDParser):
                     total_force = TotalForce()
                     output.total_force.append(total_force)
                 sec_total_force = output.total_force[0]
-                # for force_entry in data_h5md['x_h5md_force_contributions']:
-                #     sec_total_force.x_h5md_contributions.append(force_entry)
-
-    def parse_outputs_old(self, simulation: Simulation):
-        energy_classes = [m[1].__name__.replace('Energy', '').lower() for m in inspect.getmembers(energy_module, inspect.isclass) if 'Energy' in m[1].__name__]
-
-        outputs_info = self._observable_info.get('configurational')
-        if (
-            not outputs_info
-        ):  # TODO should still create entries for system time link in this case
-            return
-
-        system_info = self._system_info2.get(
-            'calculation'
-        )  # note: it is currently ensured in parse_system() that these have the same length as the system_map
-
-        for step in self.steps:
-            data = {
-                # 'method_ref': simulation.method[-1] if simulation.method else None,
-                'step': step,
-                'total_energy': {'classical_contributions': {}},
-                'total_force': {'contributions': {}},
-            } # nb - only allowing 1 contribution to total energy and total force for now
-            data_h5md = {
-                'x_h5md_custom_calculations': [],
-                'x_h5md_energy_contributions': [],
-                'x_h5md_force_contributions': [],
-            }
-            data['time'] = outputs_info.get(step, {}).get('time')
-            if not data['time']:
-                data['time'] = system_info.get(step, {}).get('time')
-
-            # TODO decide if forces will stay in system_info and will be placed still in outputs
-            forces = system_info.get(step, {}).get('forces')
-            if forces is not None:
-                data['total_force']['value'] = forces
-            # for key, val in system_info.get(step, {}).items():
-            #     if key == 'forces':
-            #         data['total_force']['value'] = val
-            #     elif hasattr(TrajectoryOutputs, key):
-            #         data[key]['value'] = val
-            #     else:
-            #         unit = None
-            #         if hasattr(val, 'units'):
-            #             unit = val.units
-            #             val = val.magnitude
-            #         data_h5md['x_h5md_custom_calculations'].append(
-            #             OutputsEntry(kind=key, value=val, unit=unit)
-            #         )
-
-            for key, val in outputs_info.get(step).items():
-                key_split = key.split('-')
-                observable_name = key_split[0]
-                observable_label = key_split[1] if len(key_split) > 1 else key_split[0]
-                if observable_name == 'total_energy':
-                    data['total_energy']['value'] = val
-                elif (
-                    'energ' in observable_name
-                ):  # TODO check for energies or energy when matching name
-                    # TODO add support for energy/mole as in parse_calculation
-                    if hasattr(ClassicalEnergyContributions, observable_label):
-                        data['total_energy']['classical_contributions'][observable_label] = {'value': val}
-                    else:
-                        data_h5md['x_h5md_energy_contributions'].append(
-                            OutputsEntry(name=key, value=val.magnitude, unit=val.units)
-                        )
-                # elif observable_name == 'forces':
-                #     data['total_force']['value'] = val
-                elif (
-                    'force' in observable_name
-                ):
-                    if hasattr(ForceContributions, observable_label):
-                        data['total_force']['contributions'][observable_label] = {'value': val}
-                    else:
-                        data_h5md['x_h5md_force_contributions'].append(
-                            OutputsEntry(name=key, value=val.magnitude, unit=val.units)
-                        )
-                elif hasattr(TrajectoryOutputs, observable_label):
-                    data[observable_label] = val
-                else:
-                    unit = None
-                    if hasattr(val, 'units'):
-                        unit = val.units
-                        val = val.magnitude
-                    data_h5md['x_h5md_custom_calculations'].append(
-                        OutputsEntry(name=key, value=val, unit=unit)
-                    )
-
-            flag_parsed = self.parse_output_step(data, simulation)
-            if flag_parsed:
-                output = simulation.outputs[-1]
-                for output_entry in data_h5md['x_h5md_custom_calculations']:
-                    output.x_h5md_custom_outputs.append(output_entry)
-                if len(output.total_energy) == 0 and data_h5md['x_h5md_energy_contributions']:
-                    total_energy = TotalEnergy()
-                    output.total_energy.append(total_energy)
-                sec_contributions = output.total_energy[0].classical_contributions
-                for energy_entry in data_h5md['x_h5md_energy_contributions']:
-                    sec_contributions.x_h5md_contributions.append(energy_entry)
-                if len(output.total_force) == 0 and data_h5md['x_h5md_force_contributions']:
-                    total_force = TotalForce()
-                    output.total_force.append(total_force)
-                sec_contributions = output.total_force[0].contributions
                 for force_entry in data_h5md['x_h5md_force_contributions']:
-                    sec_contributions.x_h5md_contributions.append(force_entry)
+                    sec_total_force.x_h5md_contributions.append(force_entry)
 
     def write_to_archive(self) -> None:
         self._maindir = os.path.dirname(self.mainfile)
